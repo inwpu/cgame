@@ -103,10 +103,9 @@ function getParticleBackgroundScript() {
       constructor() {
         this.x = Math.random() * particleCanvas.width;
         this.y = Math.random() * particleCanvas.height;
-        this.vx = (Math.random() - 0.5) * 0.5;
-        this.vy = (Math.random() - 0.5) * 0.5;
-        this.radius = 2 + Math.random() * 3;
-        this.hue = Math.random() * 360;
+        this.vx = (Math.random() - 0.5) * 0.3;
+        this.vy = (Math.random() - 0.5) * 0.3;
+        this.radius = 1.5;
       }
       update() {
         const dx = bgMouseX - this.x;
@@ -114,8 +113,8 @@ function getParticleBackgroundScript() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 150) {
           const force = (150 - dist) / 150;
-          this.vx += (dx / dist) * force * 0.5;
-          this.vy += (dy / dist) * force * 0.5;
+          this.vx += (dx / dist) * force * 0.3;
+          this.vy += (dy / dist) * force * 0.3;
         }
         this.vx *= 0.98;
         this.vy *= 0.98;
@@ -129,14 +128,12 @@ function getParticleBackgroundScript() {
       draw() {
         pCtx.beginPath();
         pCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        pCtx.fillStyle = \`hsla(\${this.hue}, 80%, 60%, 0.8)\`;
-        pCtx.shadowBlur = 10;
-        pCtx.shadowColor = \`hsla(\${this.hue}, 100%, 50%, 0.5)\`;
+        pCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         pCtx.fill();
       }
     }
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 60; i++) {
       bgParticles.push(new BgParticle());
     }
 
@@ -146,8 +143,7 @@ function getParticleBackgroundScript() {
     });
 
     function animateBgParticles() {
-      pCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-      pCtx.fillRect(0, 0, particleCanvas.width, particleCanvas.height);
+      pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
 
       // Draw connections
       for (let i = 0; i < bgParticles.length; i++) {
@@ -155,13 +151,13 @@ function getParticleBackgroundScript() {
           const dx = bgParticles[i].x - bgParticles[j].x;
           const dy = bgParticles[i].y - bgParticles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
+          if (dist < 150) {
             pCtx.beginPath();
             pCtx.moveTo(bgParticles[i].x, bgParticles[i].y);
             pCtx.lineTo(bgParticles[j].x, bgParticles[j].y);
-            const alpha = (1 - dist / 120) * 0.3;
-            pCtx.strokeStyle = \`hsla(\${(bgParticles[i].hue + bgParticles[j].hue) / 2}, 80%, 60%, \${alpha})\`;
-            pCtx.lineWidth = 1;
+            const alpha = (1 - dist / 150) * 0.15;
+            pCtx.strokeStyle = \`rgba(0, 0, 0, \${alpha})\`;
+            pCtx.lineWidth = 0.5;
             pCtx.stroke();
           }
         }
@@ -188,316 +184,187 @@ function getIndexHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>解压小游戏集合</title>
+  <title>Interactive Stress Relief Games</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(ellipse at top, #1b2735 0%, #090a0f 100%);
+      font-family: 'Times New Roman', 'SimSun', serif;
+      background: #ffffff;
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
+      padding: 60px 40px 40px;
       position: relative;
-      overflow: hidden;
-    }
-    body::before {
-      content: '';
-      position: absolute;
-      width: 200%;
-      height: 200%;
-      top: -50%;
-      left: -50%;
-      background:
-        radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(255, 0, 128, 0.2), transparent 50%),
-        radial-gradient(circle at 40% 20%, rgba(0, 255, 255, 0.2), transparent 50%);
-      animation: bgFloat 20s ease-in-out infinite;
-    }
-    @keyframes bgFloat {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      33% { transform: translate(30px, -50px) rotate(120deg); }
-      66% { transform: translate(-20px, 20px) rotate(240deg); }
-    }
-    .stars {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-    .star {
-      position: absolute;
-      width: 2px;
-      height: 2px;
-      background: white;
-      border-radius: 50%;
-      animation: twinkle 3s infinite;
-    }
-    @keyframes twinkle {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 1; }
+      line-height: 1.8;
     }
     .container {
-      max-width: 1200px;
-      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
       position: relative;
       z-index: 10;
     }
-    h1 {
-      text-align: center;
-      color: white;
-      font-size: 3.5em;
-      margin-bottom: 20px;
-      text-shadow: 0 0 20px rgba(120, 119, 198, 0.8), 0 0 40px rgba(120, 119, 198, 0.5);
-      animation: glow 2s ease-in-out infinite alternate;
-    }
-    @keyframes glow {
-      from { text-shadow: 0 0 20px rgba(120, 119, 198, 0.8), 0 0 40px rgba(120, 119, 198, 0.5); }
-      to { text-shadow: 0 0 30px rgba(120, 119, 198, 1), 0 0 60px rgba(120, 119, 198, 0.8); }
-    }
-    .subtitle {
-      text-align: center;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 1.2em;
+    header {
+      border-bottom: 2px solid #000;
+      padding-bottom: 30px;
       margin-bottom: 50px;
-      letter-spacing: 2px;
+    }
+    h1 {
+      font-size: 2.5em;
+      font-weight: 400;
+      color: #000;
+      margin-bottom: 15px;
+      letter-spacing: -0.5px;
+    }
+    .meta {
+      font-size: 0.95em;
+      color: #666;
+      font-style: italic;
+      margin-bottom: 20px;
+    }
+    .abstract {
+      background: #f9f9f9;
+      border-left: 3px solid #000;
+      padding: 20px 25px;
+      margin: 40px 0;
+      font-size: 0.95em;
+      color: #333;
+    }
+    .abstract strong {
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.85em;
+      letter-spacing: 1px;
+    }
+    .section-title {
+      font-size: 1.3em;
+      font-weight: 600;
+      color: #000;
+      margin: 40px 0 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 8px;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 30px;
-      margin-bottom: 40px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
     }
     .card {
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
-      padding: 35px;
-      text-align: center;
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 25px;
       cursor: pointer;
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
       position: relative;
-      overflow: visible;
-    }
-    .card::before {
-      content: '';
-      position: absolute;
-      top: -3px;
-      left: -3px;
-      right: -3px;
-      bottom: -3px;
-      background: linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
-      background-size: 400%;
-      border-radius: 20px;
-      z-index: -1;
-      animation: rainbow 4s linear infinite;
-      filter: blur(10px);
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-    .card::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border-radius: 20px;
-      box-shadow: 0 0 40px rgba(120, 119, 198, 0.4);
-      opacity: 0.6;
-      animation: breathe 3s ease-in-out infinite;
-    }
-    @keyframes rainbow {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    @keyframes breathe {
-      0%, 100% { box-shadow: 0 0 20px rgba(120, 119, 198, 0.4); }
-      50% { box-shadow: 0 0 60px rgba(120, 119, 198, 0.8); }
     }
     .card:hover {
-      transform: translateY(-15px) scale(1.05);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border-color: #000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transform: translateY(-2px);
     }
-    .card:hover::before {
-      opacity: 0.9;
-      animation: rainbow 2s linear infinite, sparkle 0.6s ease-in-out infinite;
+    .card-number {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 0.75em;
+      color: #999;
+      font-weight: 600;
     }
-    @keyframes sparkle {
-      0%, 100% { filter: blur(10px) brightness(1); }
-      50% { filter: blur(15px) brightness(1.5); }
-    }
-    .card h2 {
-      color: white;
-      font-size: 1.6em;
-      margin-bottom: 12px;
-      position: relative;
-      z-index: 1;
+    .card h3 {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 10px;
     }
     .card p {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.95em;
-      position: relative;
-      z-index: 1;
-    }
-    .icon {
-      font-size: 3.5em;
-      margin-bottom: 15px;
-      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+      font-size: 0.9em;
+      color: #666;
+      line-height: 1.6;
     }
     .stats {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(120, 119, 198, 0.3);
-      color: white;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
       padding: 15px;
-      border-radius: 15px;
-      font-size: 12px;
-      max-width: 300px;
+      font-size: 11px;
+      max-width: 250px;
       z-index: 100;
-      box-shadow: 0 0 30px rgba(120, 119, 198, 0.3);
+      font-family: 'Courier New', monospace;
     }
-    .stats div { margin: 5px 0; }
-    .footer {
+    .stats div { margin: 4px 0; color: #333; }
+    .stats strong { font-weight: 600; }
+    footer {
+      margin-top: 60px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
       text-align: center;
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 0.9em;
-      margin-top: 30px;
-    }
-    .floating-shapes {
-      position: fixed;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .shape {
-      position: absolute;
-      opacity: 0.1;
-      animation: float 20s infinite ease-in-out;
-    }
-    .shape:nth-child(1) {
-      width: 80px;
-      height: 80px;
-      border: 2px solid cyan;
-      border-radius: 50%;
-      top: 10%;
-      left: 10%;
-      animation-delay: 0s;
-    }
-    .shape:nth-child(2) {
-      width: 60px;
-      height: 60px;
-      border: 2px solid magenta;
-      top: 70%;
-      left: 80%;
-      animation-delay: -5s;
-    }
-    .shape:nth-child(3) {
-      width: 100px;
-      height: 100px;
-      border: 2px solid yellow;
-      border-radius: 50%;
-      top: 30%;
-      left: 85%;
-      animation-delay: -10s;
-    }
-    .shape:nth-child(4) {
-      width: 70px;
-      height: 70px;
-      border: 2px solid lime;
-      top: 80%;
-      left: 15%;
-      animation-delay: -15s;
-    }
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      25% { transform: translate(20px, -30px) rotate(90deg); }
-      50% { transform: translate(-20px, 30px) rotate(180deg); }
-      75% { transform: translate(30px, 20px) rotate(270deg); }
+      font-size: 0.85em;
+      color: #999;
     }
   </style>
 </head>
 <body>
-  <div class="stars" id="stars"></div>
-  <div class="floating-shapes">
-    <div class="shape"></div>
-    <div class="shape"></div>
-    <div class="shape"></div>
-    <div class="shape"></div>
-  </div>
   <div class="container">
-    <h1>🎮 解压小游戏</h1>
-    <div class="subtitle">STRESS RELIEF GAMES COLLECTION</div>
+    <header>
+      <h1>Interactive Stress Relief Games: A Minimalist Approach</h1>
+      <div class="meta">
+        Computational Design Lab · 2025 · Interactive Systems Research
+      </div>
+    </header>
+
+    <div class="abstract">
+      <strong>Abstract</strong><br>
+      This work presents a collection of six interactive applications designed for stress relief through minimal user interaction. Each application employs distinct visual and interaction paradigms, ranging from physics-based simulations to generative visual patterns. The implementations prioritize simplicity, responsiveness, and therapeutic value.
+    </div>
+
+    <div class="section-title">1. Experimental Applications</div>
     <div class="grid">
       <div class="card" onclick="location.href='/slime'">
-        <div class="icon">🧪</div>
-        <h2>无限扭曲史莱姆</h2>
-        <p>点击拖拽产生果冻形变</p>
+        <div class="card-number">1.1</div>
+        <h3>Viscous Deformation Simulation</h3>
+        <p>Real-time soft-body physics with elastic recovery and breathable morphology.</p>
       </div>
       <div class="card" onclick="location.href='/bounce'">
-        <div class="icon">⚽</div>
-        <h2>小球碰碰碰</h2>
-        <p>点击生成反弹小球</p>
+        <div class="card-number">1.2</div>
+        <h3>Collision Dynamics System</h3>
+        <p>Multi-particle collision detection with gravity simulation and acoustic feedback.</p>
       </div>
       <div class="card" onclick="location.href='/fountain'">
-        <div class="icon">🎆</div>
-        <h2>粒子喷泉</h2>
-        <p>点击喷出彩色粒子</p>
+        <div class="card-number">1.3</div>
+        <h3>Particle Emission Engine</h3>
+        <p>Configurable particle systems with multiple emission patterns and physics models.</p>
       </div>
       <div class="card" onclick="location.href='/kaleidoscope'">
-        <div class="icon">🌈</div>
-        <h2>万花筒</h2>
-        <p>鼠标移动生成图案</p>
+        <div class="card-number">1.4</div>
+        <h3>Symmetrical Pattern Generator</h3>
+        <p>Dynamic kaleidoscope with adjustable mirror segments and color schemes.</p>
       </div>
       <div class="card" onclick="location.href='/breathing'">
-        <div class="icon">🎨</div>
-        <h2>色块呼吸灯</h2>
-        <p>舒缓的颜色变化</p>
+        <div class="card-number">1.5</div>
+        <h3>Chromatic Oscillation Grid</h3>
+        <p>Asynchronous color transitions with parametric wave functions.</p>
       </div>
       <div class="card" onclick="location.href='/cube3'">
-        <div class="icon">🧊</div>
-        <h2>魔方模拟器</h2>
-        <p>3×3 / 4×4 / 5×5</p>
+        <div class="card-number">1.6</div>
+        <h3>3D Combinatorial Puzzle</h3>
+        <p>Interactive Rubik's cube with configurable dimensions (3×3, 4×4, 5×5).</p>
       </div>
     </div>
-    <div class="footer">
-      <p>让压力随指尖消散 · 在游戏中找回平静</p>
-    </div>
+
+    <footer>
+      © 2025 · Stress Relief Research Initiative
+    </footer>
   </div>
-  <div class="stats" id="stats">加载中...</div>
-  <script>
-    // Generate stars
-    const starsContainer = document.getElementById('stars');
-    for (let i = 0; i < 100; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
-      star.style.left = Math.random() * 100 + '%';
-      star.style.top = Math.random() * 100 + '%';
-      star.style.animationDelay = Math.random() * 3 + 's';
-      starsContainer.appendChild(star);
-    }
-  </script>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
+        <div><strong>VISITOR STATS</strong></div>
+        <div>Total Visitors: \${data.visitors}</div>
+        <div>Total Views: \${data.visits}</div>
+        <div style="margin-top:8px"><strong>Recent IPs:</strong></div>
+        \${data.ips.map(v => \`<div>\${v.ip} (\${v.count}x)</div>\`).join('')}
       \`;
     });
   </script>
