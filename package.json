@@ -1,0 +1,13 @@
+{
+  "name": "cgame",
+  "version": "1.0.0",
+  "description": "解压小游戏集合 - Cloudflare Workers",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
