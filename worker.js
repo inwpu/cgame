@@ -308,7 +308,7 @@ function getIndexHTML() {
     <header>
       <h1>Interactive Stress Relief Games: A Minimalist Approach</h1>
       <div class="meta">
-        Computational Design Lab · 2025 · Interactive Systems Research
+        hxorz Lab · 2025 · Interactive Systems Research
       </div>
     </header>
 
@@ -1288,37 +1288,64 @@ function getCubeHTML(size) {
     }
 
     function createRubiksCube() {
-      const colors = [
-        0xff3333, 0x33ff33, 0x3333ff,
-        0xffff33, 0xffffff, 0xff8833
+      // Security conferences with their brand colors
+      const faces = [
+        { name: 'IEEE S&P', color: 0x003f87, textColor: 0xffffff }, // IEEE Blue
+        { name: 'USENIX', color: 0x8B0000, textColor: 0xffffff },   // Dark Red
+        { name: 'CCS', color: 0x2E8B57, textColor: 0xffffff },      // Sea Green
+        { name: 'NDSS', color: 0xFF8C00, textColor: 0x000000 },     // Dark Orange
+        { name: 'BlackHat', color: 0x000000, textColor: 0xffffff }, // Black
+        { name: 'DEFCON', color: 0xFF0000, textColor: 0xffffff }    // Red
       ];
 
       for (let x = 0; x < SIZE; x++) {
         for (let y = 0; y < SIZE; y++) {
           for (let z = 0; z < SIZE; z++) {
             const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-            const materials = colors.map(color => {
+
+            // Create materials with text for each face
+            const materials = faces.map((face, faceIndex) => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 256;
+              canvas.height = 256;
+              const context = canvas.getContext('2d');
+
+              // Background
+              context.fillStyle = '#' + face.color.toString(16).padStart(6, '0');
+              context.fillRect(0, 0, 256, 256);
+
+              // Text
+              context.fillStyle = '#' + face.textColor.toString(16).padStart(6, '0');
+              context.font = 'bold 36px Arial';
+              context.textAlign = 'center';
+              context.textBaseline = 'middle';
+              context.fillText(face.name, 128, 128);
+
+              // Border
+              context.strokeStyle = '#' + face.textColor.toString(16).padStart(6, '0');
+              context.lineWidth = 4;
+              context.strokeRect(2, 2, 252, 252);
+
+              const texture = new THREE.CanvasTexture(canvas);
               return new THREE.MeshPhongMaterial({
-                color,
-                shininess: 100,
-                specular: 0x666666,
-                emissive: color,
-                emissiveIntensity: 0.2
+                map: texture,
+                shininess: 30,
+                specular: 0x222222
               });
             });
 
             const cube = new THREE.Mesh(geometry, materials);
-            cube.position.set(
-              (x - SIZE / 2 + 0.5) * (1 + GAP),
-              (y - SIZE / 2 + 0.5) * (1 + GAP),
-              (z - SIZE / 2 + 0.5) * (1 + GAP)
-            );
+            const posX = (x - SIZE / 2 + 0.5) * (1 + GAP);
+            const posY = (y - SIZE / 2 + 0.5) * (1 + GAP);
+            const posZ = (z - SIZE / 2 + 0.5) * (1 + GAP);
 
+            cube.position.set(posX, posY, posZ);
             cube.castShadow = true;
             cube.receiveShadow = true;
 
             cube.userData = {
-              initPos: cube.position.clone(),
+              initPos: new THREE.Vector3(posX, posY, posZ),
+              initRot: new THREE.Euler(0, 0, 0),
               gridPos: { x, y, z }
             };
 
@@ -1385,14 +1412,16 @@ function getCubeHTML(size) {
       const gridPos = clickedCube.userData.gridPos;
       let axis, layer;
 
-      if (faceIndex === 0) { axis = 'x'; layer = SIZE - 1; }
-      else if (faceIndex === 1) { axis = 'x'; layer = 0; }
-      else if (faceIndex === 2) { axis = 'y'; layer = SIZE - 1; }
-      else if (faceIndex === 3) { axis = 'y'; layer = 0; }
-      else if (faceIndex === 4) { axis = 'z'; layer = SIZE - 1; }
-      else if (faceIndex === 5) { axis = 'z'; layer = 0; }
+      // Map face to axis and layer based on clicked cubelet position
+      if (faceIndex === 0) { axis = 'x'; layer = gridPos.x; } // Right face
+      else if (faceIndex === 1) { axis = 'x'; layer = gridPos.x; } // Left face
+      else if (faceIndex === 2) { axis = 'y'; layer = gridPos.y; } // Top face
+      else if (faceIndex === 3) { axis = 'y'; layer = gridPos.y; } // Bottom face
+      else if (faceIndex === 4) { axis = 'z'; layer = gridPos.z; } // Front face
+      else if (faceIndex === 5) { axis = 'z'; layer = gridPos.z; } // Back face
 
-      animateRotation(axis, layer, Math.PI / 2);
+      const direction = (faceIndex % 2 === 0) ? 1 : -1;
+      animateRotation(axis, layer, (Math.PI / 2) * direction);
     }
 
     function animateRotation(axis, layer, angle) {
@@ -1400,7 +1429,7 @@ function getCubeHTML(size) {
       const duration = 300;
       const startTime = Date.now();
       const layerGroup = new THREE.Group();
-      scene.add(layerGroup);
+      rubikGroup.add(layerGroup);
 
       const cubesToRotate = [];
       cubelets.forEach(cube => {
@@ -1413,41 +1442,71 @@ function getCubeHTML(size) {
 
         if (shouldRotate) {
           cubesToRotate.push(cube);
-          rubikGroup.remove(cube);
-          layerGroup.add(cube);
+          THREE.SceneUtils.detach(cube, rubikGroup, layerGroup);
         }
       });
 
       function rotateStep() {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const currentAngle = angle * progress;
+        const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+        const currentAngle = angle * eased;
 
         layerGroup.rotation[axis] = currentAngle;
 
         if (progress < 1) {
           requestAnimationFrame(rotateStep);
         } else {
+          // Update grid positions based on rotation
           cubesToRotate.forEach(cube => {
-            const worldPos = new THREE.Vector3();
-            cube.getWorldPosition(worldPos);
-            const worldRot = new THREE.Euler();
-            cube.getWorldQuaternion(new THREE.Quaternion()).toEuler(worldRot);
+            THREE.SceneUtils.attach(cube, layerGroup, rubikGroup);
 
-            layerGroup.remove(cube);
-            rubikGroup.add(cube);
+            const pos = cube.userData.gridPos;
+            const center = (SIZE - 1) / 2;
 
-            cube.position.copy(worldPos);
-            cube.rotation.copy(worldRot);
+            if (axis === 'x') {
+              const newY = Math.round(center - (pos.z - center) * Math.sign(angle));
+              const newZ = Math.round(center + (pos.y - center) * Math.sign(angle));
+              pos.y = newY;
+              pos.z = newZ;
+            } else if (axis === 'y') {
+              const newX = Math.round(center + (pos.z - center) * Math.sign(angle));
+              const newZ = Math.round(center - (pos.x - center) * Math.sign(angle));
+              pos.x = newX;
+              pos.z = newZ;
+            } else if (axis === 'z') {
+              const newX = Math.round(center - (pos.y - center) * Math.sign(angle));
+              const newY = Math.round(center + (pos.x - center) * Math.sign(angle));
+              pos.x = newX;
+              pos.y = newY;
+            }
           });
 
-          scene.remove(layerGroup);
+          rubikGroup.remove(layerGroup);
           isAnimating = false;
         }
       }
 
       rotateStep();
     }
+
+    // Add THREE.SceneUtils.attach and detach helpers
+    THREE.SceneUtils = {
+      attach: function(child, scene, parent) {
+        child.parent.updateMatrixWorld();
+        child.applyMatrix4(child.parent.matrixWorld);
+        child.parent.remove(child);
+        child.applyMatrix4(parent.matrixWorld.clone().invert());
+        parent.add(child);
+      },
+      detach: function(child, parent, scene) {
+        child.parent.updateMatrixWorld();
+        child.applyMatrix4(child.parent.matrixWorld);
+        child.parent.remove(child);
+        child.applyMatrix4(scene.matrixWorld.clone().invert());
+        scene.add(child);
+      }
+    };
 
     function scrambleCube() {
       if (isAnimating) return;
@@ -1468,14 +1527,14 @@ function getCubeHTML(size) {
     }
 
     function solveCube() {
-      cubelets.forEach(cube => {
+      if (isAnimating) return;
+      cubelets.forEach((cube, idx) => {
         cube.position.copy(cube.userData.initPos);
-        cube.rotation.set(0, 0, 0);
-        cube.userData.gridPos = {
-          x: Math.round((cube.position.x / (1 + GAP)) + SIZE / 2 - 0.5),
-          y: Math.round((cube.position.y / (1 + GAP)) + SIZE / 2 - 0.5),
-          z: Math.round((cube.position.z / (1 + GAP)) + SIZE / 2 - 0.5)
-        };
+        cube.rotation.copy(cube.userData.initRot);
+        const x = Math.floor(idx / (SIZE * SIZE));
+        const y = Math.floor((idx % (SIZE * SIZE)) / SIZE);
+        const z = idx % SIZE;
+        cube.userData.gridPos = { x, y, z };
       });
     }
 
