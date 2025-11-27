@@ -522,10 +522,10 @@ function getSlimeHTML() {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
@@ -707,10 +707,10 @@ function getBounceHTML() {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
@@ -748,11 +748,11 @@ function getFountainHTML() {
 <body>
   <a href="/" class="back">← 返回</a>
   <div class="controls">
-    <button onclick="mode='firework'">烟花🎆</button>
-    <button onclick="mode='fountain'">喷泉⛲</button>
-    <button onclick="mode='spiral'">螺旋🌀</button>
-    <button onclick="mode='rainbow'">彩虹🌈</button>
-    <button onclick="mode='explosion'">爆炸💥</button>
+    <button onclick="mode='firework'">烟花</button>
+    <button onclick="mode='fountain'">喷泉</button>
+    <button onclick="mode='spiral'">螺旋</button>
+    <button onclick="mode='rainbow'">彩虹</button>
+    <button onclick="mode='explosion'">爆炸</button>
   </div>
   <canvas id="canvas"></canvas>
   <div class="stats" id="stats">加载中...</div>
@@ -890,10 +890,10 @@ function getFountainHTML() {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
@@ -1008,10 +1008,10 @@ function getKaleidoscopeHTML() {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
@@ -1050,9 +1050,9 @@ function getBreathingHTML() {
 <body>
   <a href="/" class="back">← 返回</a>
   <div class="controls">
-    <button onclick="changeTheme('tech')">科技蓝💙</button>
-    <button onclick="changeTheme('zen')">禅意绿💚</button>
-    <button onclick="changeTheme('rainbow')">无限彩虹🌈</button>
+    <button onclick="changeTheme('tech')">科技蓝</button>
+    <button onclick="changeTheme('zen')">禅意绿</button>
+    <button onclick="changeTheme('rainbow')">无限彩虹</button>
   </div>
   <div class="grid" id="grid"></div>
   <div class="stats" id="stats">加载中...</div>
@@ -1106,10 +1106,10 @@ function getBreathingHTML() {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
@@ -1131,7 +1131,8 @@ function getCube5HTML() {
 }
 
 function getCubeHTML(size) {
-  const cameraZ = size === 3 ? 8 : size === 4 ? 10 : 12;
+  const cameraZ = 10;
+  const scaleFactor = 3 / size; // Keep total cube visual size constant
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1216,7 +1217,7 @@ function getCubeHTML(size) {
   </div>
   <a href="/" class="back">← 返回</a>
   <div class="info-panel">
-    <h3>🎮 操作说明</h3>
+    <h3>操作说明</h3>
     <p><strong>拖拽旋转：</strong>鼠标左键拖动</p>
     <p><strong>点击面块：</strong>旋转该层</p>
     <p><strong>打乱：</strong>随机打乱魔方</p>
@@ -1225,8 +1226,8 @@ function getCubeHTML(size) {
   </div>
   <div class="controls">
     <div><a href="/cube3">3×3</a><a href="/cube4">4×4</a><a href="/cube5">5×5</a></div>
-    <button onclick="scrambleCube()">🎲 打乱</button>
-    <button onclick="solveCube()">✨ 复原</button>
+    <button onclick="scrambleCube()">打乱</button>
+    <button onclick="solveCube()">复原</button>
   </div>
   <div id="container"></div>
   <div class="stats" id="stats">加载中...</div>
@@ -1238,6 +1239,7 @@ function getCubeHTML(size) {
     let raycaster, mouse;
     const SIZE = ${size};
     const GAP = 0.05;
+    const SCALE = ${scaleFactor.toFixed(3)};
     const cubeState = [];
     let isAnimating = false;
 
@@ -1290,43 +1292,54 @@ function getCubeHTML(size) {
     function createRubiksCube() {
       // Security conferences with their brand colors
       const faces = [
-        { name: 'IEEE S&P', color: 0x003f87, textColor: 0xffffff }, // IEEE Blue
-        { name: 'USENIX', color: 0x8B0000, textColor: 0xffffff },   // Dark Red
-        { name: 'CCS', color: 0x2E8B57, textColor: 0xffffff },      // Sea Green
-        { name: 'NDSS', color: 0xFF8C00, textColor: 0x000000 },     // Dark Orange
-        { name: 'BlackHat', color: 0x000000, textColor: 0xffffff }, // Black
-        { name: 'DEFCON', color: 0xFF0000, textColor: 0xffffff }    // Red
+        { name: 'IEEE S&P', color: '#003f87', textColor: '#ffffff' }, // IEEE Blue
+        { name: 'USENIX', color: '#8B0000', textColor: '#ffffff' },   // Dark Red
+        { name: 'CCS', color: '#2E8B57', textColor: '#ffffff' },      // Sea Green
+        { name: 'NDSS', color: '#FF8C00', textColor: '#000000' },     // Dark Orange
+        { name: 'BlackHat', color: '#000000', textColor: '#ffffff' }, // Black
+        { name: 'DEFCON', color: '#FF0000', textColor: '#ffffff' }    // Red
       ];
+
+      // Calculate font size based on cube size to maintain readability
+      const fontSize = Math.floor(48 / (SIZE / 3));
 
       for (let x = 0; x < SIZE; x++) {
         for (let y = 0; y < SIZE; y++) {
           for (let z = 0; z < SIZE; z++) {
-            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            const geometry = new THREE.BoxGeometry(0.95 * SCALE, 0.95 * SCALE, 0.95 * SCALE);
 
             // Create materials with text for each face
             const materials = faces.map((face, faceIndex) => {
               const canvas = document.createElement('canvas');
-              canvas.width = 256;
-              canvas.height = 256;
+              canvas.width = 512;
+              canvas.height = 512;
               const context = canvas.getContext('2d');
 
+              // Enable high quality rendering
+              context.imageSmoothingEnabled = true;
+              context.imageSmoothingQuality = 'high';
+
               // Background
-              context.fillStyle = '#' + face.color.toString(16).padStart(6, '0');
-              context.fillRect(0, 0, 256, 256);
+              context.fillStyle = face.color;
+              context.fillRect(0, 0, 512, 512);
 
               // Text
-              context.fillStyle = '#' + face.textColor.toString(16).padStart(6, '0');
-              context.font = 'bold 36px Arial';
+              context.fillStyle = face.textColor;
+              context.font = \`bold \${fontSize * 2}px Arial, sans-serif\`;
               context.textAlign = 'center';
               context.textBaseline = 'middle';
-              context.fillText(face.name, 128, 128);
+              context.fillText(face.name, 256, 256);
 
               // Border
-              context.strokeStyle = '#' + face.textColor.toString(16).padStart(6, '0');
-              context.lineWidth = 4;
-              context.strokeRect(2, 2, 252, 252);
+              context.strokeStyle = face.textColor;
+              context.lineWidth = 8;
+              context.strokeRect(4, 4, 504, 504);
 
               const texture = new THREE.CanvasTexture(canvas);
+              texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+              texture.minFilter = THREE.LinearMipMapLinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+
               return new THREE.MeshPhongMaterial({
                 map: texture,
                 shininess: 30,
@@ -1335,9 +1348,9 @@ function getCubeHTML(size) {
             });
 
             const cube = new THREE.Mesh(geometry, materials);
-            const posX = (x - SIZE / 2 + 0.5) * (1 + GAP);
-            const posY = (y - SIZE / 2 + 0.5) * (1 + GAP);
-            const posZ = (z - SIZE / 2 + 0.5) * (1 + GAP);
+            const posX = (x - SIZE / 2 + 0.5) * (1 + GAP) * SCALE;
+            const posY = (y - SIZE / 2 + 0.5) * (1 + GAP) * SCALE;
+            const posZ = (z - SIZE / 2 + 0.5) * (1 + GAP) * SCALE;
 
             cube.position.set(posX, posY, posZ);
             cube.castShadow = true;
@@ -1556,10 +1569,10 @@ function getCubeHTML(size) {
 
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>📊 访客统计</strong></div>
+        <div><strong>访客统计</strong></div>
         <div>总访客: \${data.visitors}</div>
         <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>🌐 最近访客IP:</strong></div>
+        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
         \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
       \`;
     });
