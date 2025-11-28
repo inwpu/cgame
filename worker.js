@@ -1742,226 +1742,143 @@ function getCubeHTML(size) {
       }
     }
 
-    let dragStartPos = { x: 0, y: 0 };
+    let dragStartPos = new THREE.Vector2();
+    let currentPos = new THREE.Vector2();
     let isMouseDown = false;
     let isDraggingCube = false;
-    let isDraggingLayer = false;
     let selectedCube = null;
-    let selectedFace = null;
-    let dragAxis = null;
-    const DRAG_THRESHOLD = 10; // pixels
+    let selectedNormal = null;
+    let intersectionPoint = null;
+    let rotationAxis = null;
+    let rotationLayer = null;
+    let axisDetermined = false;
+    const DRAG_THRESHOLD = 5;
 
     function onMouseDown(e) {
+      if (isAnimating) return;
+
       isMouseDown = true;
       isDraggingCube = false;
-      isDraggingLayer = false;
-      dragStartPos = { x: e.clientX, y: e.clientY };
-      previousMouse = { x: e.clientX, y: e.clientY };
+      axisDetermined = false;
 
-      // Check if clicking on a cube face
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const x = e.clientX;
+      const y = e.clientY;
+      dragStartPos.set(x, y);
+      currentPos.set(x, y);
+
+      // Raycast to check if clicking on cube
+      mouse.x = (x / window.innerWidth) * 2 - 1;
+      mouse.y = -(y / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(cubelets);
 
       if (intersects.length > 0) {
-        selectedCube = intersects[0].object;
-        selectedFace = intersects[0].face;
-        dragAxis = null;
+        const intersect = intersects[0];
+        selectedCube = intersect.object;
+        selectedNormal = intersect.face.normal.clone();
+        selectedNormal.transformDirection(selectedCube.matrixWorld);
+        intersectionPoint = intersect.point.clone();
       } else {
         selectedCube = null;
-        selectedFace = null;
+        selectedNormal = null;
+        intersectionPoint = null;
       }
     }
 
     function onMouseMove(e) {
       if (!isMouseDown) return;
 
-      const deltaX = e.clientX - dragStartPos.x;
-      const deltaY = e.clientY - dragStartPos.y;
-      const totalDelta = Math.abs(deltaX) + Math.abs(deltaY);
+      currentPos.set(e.clientX, e.clientY);
 
-      // Determine if dragging cube or layer
-      if (totalDelta > DRAG_THRESHOLD && !isDraggingCube && !isDraggingLayer) {
-        if (selectedCube) {
-          // Dragging a layer
-          isDraggingLayer = true;
+      // Calculate drag direction
+      const dragVector = new THREE.Vector2();
+      dragVector.subVectors(currentPos, dragStartPos);
+      const dragDistance = dragVector.length();
 
-          // Get face normal in world space
-          const normal = selectedFace.normal.clone();
-          normal.transformDirection(selectedCube.matrixWorld);
+      if (selectedCube && !axisDetermined && dragDistance > DRAG_THRESHOLD) {
+        // Determine rotation axis based on drag direction
+        axisDetermined = true;
 
-          // Determine drag axis based on drag direction and face normal
-          const absDeltaX = Math.abs(deltaX);
-          const absDeltaY = Math.abs(deltaY);
+        // Normalize drag direction in screen space
+        const screenDrag = new THREE.Vector3(dragVector.x, -dragVector.y, 0).normalize();
 
-          // Get the two axes perpendicular to the normal
-          const absNormalX = Math.abs(normal.x);
-          const absNormalY = Math.abs(normal.y);
-          const absNormalZ = Math.abs(normal.z);
+        // Get rotation axis by cross product of normal and screen drag
+        const axis3D = new THREE.Vector3();
+        axis3D.crossVectors(selectedNormal, screenDrag);
 
-          let rotationAxis, rotationLayer, rotationDirection;
-          const gridPos = selectedCube.userData.gridPos;
+        // Snap to nearest axis
+        const absX = Math.abs(axis3D.x);
+        const absY = Math.abs(axis3D.y);
+        const absZ = Math.abs(axis3D.z);
 
-          if (absNormalX > absNormalY && absNormalX > absNormalZ) {
-            // Normal is along X axis - can rotate Y or Z
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'z';
-              rotationLayer = gridPos.z;
-              rotationDirection = deltaY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
-            } else {
-              rotationAxis = 'y';
-              rotationLayer = gridPos.y;
-              rotationDirection = deltaX > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
-            }
-          } else if (absNormalY > absNormalX && absNormalY > absNormalZ) {
-            // Normal is along Y axis - can rotate X or Z
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'z';
-              rotationLayer = gridPos.z;
-              rotationDirection = deltaY > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
-            } else {
-              rotationAxis = 'x';
-              rotationLayer = gridPos.x;
-              rotationDirection = deltaX > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
-            }
-          } else {
-            // Normal is along Z axis - can rotate X or Y
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'y';
-              rotationLayer = gridPos.y;
-              rotationDirection = deltaY > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
-            } else {
-              rotationAxis = 'x';
-              rotationLayer = gridPos.x;
-              rotationDirection = deltaX > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
-            }
-          }
+        const gridPos = selectedCube.userData.gridPos;
 
-          dragAxis = { axis: rotationAxis, layer: rotationLayer, direction: rotationDirection };
-          animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * rotationDirection);
-
+        if (absX > absY && absX > absZ) {
+          rotationAxis = 'x';
+          rotationLayer = gridPos.x;
+        } else if (absY > absX && absY > absZ) {
+          rotationAxis = 'y';
+          rotationLayer = gridPos.y;
         } else {
-          // Dragging the whole cube
+          rotationAxis = 'z';
+          rotationLayer = gridPos.z;
+        }
+
+        // Start rotation
+        const direction = determineDirection(rotationAxis, screenDrag, selectedNormal);
+        animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * direction);
+      } else if (!selectedCube) {
+        // Dragging whole cube
+        if (!isDraggingCube && dragDistance > DRAG_THRESHOLD) {
           isDraggingCube = true;
         }
-      }
 
-      if (isDraggingCube) {
-        const dx = e.clientX - previousMouse.x;
-        const dy = e.clientY - previousMouse.y;
-        rubikGroup.rotation.y += dx * 0.01;
-        rubikGroup.rotation.x += dy * 0.01;
+        if (isDraggingCube) {
+          const delta = new THREE.Vector2();
+          delta.subVectors(currentPos, new THREE.Vector2(previousMouse.x, previousMouse.y));
+          rubikGroup.rotation.y += delta.x * 0.01;
+          rubikGroup.rotation.x += delta.y * 0.01;
+        }
       }
 
       previousMouse = { x: e.clientX, y: e.clientY };
     }
 
+    function determineDirection(axis, screenDrag, normal) {
+      // Determine rotation direction based on axis and drag direction
+      if (axis === 'x') {
+        return screenDrag.y * normal.x - screenDrag.x * normal.z > 0 ? 1 : -1;
+      } else if (axis === 'y') {
+        return screenDrag.x * normal.z - screenDrag.y * normal.x > 0 ? 1 : -1;
+      } else { // z
+        return screenDrag.y * normal.x + screenDrag.x * normal.y > 0 ? 1 : -1;
+      }
+    }
+
     function onMouseUp() {
       isMouseDown = false;
       isDraggingCube = false;
-      isDraggingLayer = false;
+      axisDetermined = false;
       selectedCube = null;
-      selectedFace = null;
-      dragAxis = null;
+      selectedNormal = null;
+      rotationAxis = null;
+      rotationLayer = null;
     }
 
     function onTouchStart(e) {
-      if (e.touches.length === 1) {
+      if (e.touches.length === 1 && !isAnimating) {
         const touch = e.touches[0];
-        isMouseDown = true;
-        isDraggingCube = false;
-        isDraggingLayer = false;
-        dragStartPos = { x: touch.clientX, y: touch.clientY };
-        previousMouse = { x: touch.clientX, y: touch.clientY };
-
-        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(cubelets);
-
-        if (intersects.length > 0) {
-          selectedCube = intersects[0].object;
-          selectedFace = intersects[0].face;
-          dragAxis = null;
-        } else {
-          selectedCube = null;
-          selectedFace = null;
-        }
+        onMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+        e.preventDefault();
       }
     }
 
     function onTouchMove(e) {
-      if (!isMouseDown || e.touches.length !== 1) return;
-
-      const touch = e.touches[0];
-      const deltaX = touch.clientX - dragStartPos.x;
-      const deltaY = touch.clientY - dragStartPos.y;
-      const totalDelta = Math.abs(deltaX) + Math.abs(deltaY);
-
-      if (totalDelta > DRAG_THRESHOLD && !isDraggingCube && !isDraggingLayer) {
-        if (selectedCube) {
-          isDraggingLayer = true;
-          const normal = selectedFace.normal.clone();
-          normal.transformDirection(selectedCube.matrixWorld);
-
-          const absDeltaX = Math.abs(deltaX);
-          const absDeltaY = Math.abs(deltaY);
-          const absNormalX = Math.abs(normal.x);
-          const absNormalY = Math.abs(normal.y);
-          const absNormalZ = Math.abs(normal.z);
-
-          let rotationAxis, rotationLayer, rotationDirection;
-          const gridPos = selectedCube.userData.gridPos;
-
-          if (absNormalX > absNormalY && absNormalX > absNormalZ) {
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'z';
-              rotationLayer = gridPos.z;
-              rotationDirection = deltaY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
-            } else {
-              rotationAxis = 'y';
-              rotationLayer = gridPos.y;
-              rotationDirection = deltaX > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
-            }
-          } else if (absNormalY > absNormalX && absNormalY > absNormalZ) {
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'z';
-              rotationLayer = gridPos.z;
-              rotationDirection = deltaY > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
-            } else {
-              rotationAxis = 'x';
-              rotationLayer = gridPos.x;
-              rotationDirection = deltaX > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
-            }
-          } else {
-            if (absDeltaY > absDeltaX) {
-              rotationAxis = 'y';
-              rotationLayer = gridPos.y;
-              rotationDirection = deltaY > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
-            } else {
-              rotationAxis = 'x';
-              rotationLayer = gridPos.x;
-              rotationDirection = deltaX > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
-            }
-          }
-
-          dragAxis = { axis: rotationAxis, layer: rotationLayer, direction: rotationDirection };
-          animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * rotationDirection);
-        } else {
-          isDraggingCube = true;
-        }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        onMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+        e.preventDefault();
       }
-
-      if (isDraggingCube) {
-        const dx = touch.clientX - previousMouse.x;
-        const dy = touch.clientY - previousMouse.y;
-        rubikGroup.rotation.y += dx * 0.01;
-        rubikGroup.rotation.x += dy * 0.01;
-      }
-
-      previousMouse = { x: touch.clientX, y: touch.clientY };
-      e.preventDefault();
     }
 
     function animateRotation(axis, layer, angle) {
