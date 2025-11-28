@@ -1813,8 +1813,9 @@ function getCubeHTML(size) {
       if (controlState.rotating) {
         const deltaX = x - controlState.lastMouse.x;
         const deltaY = y - controlState.lastMouse.y;
+        // Rotate in direction of mouse movement
         rubikGroup.rotation.y += deltaX * 0.01;
-        rubikGroup.rotation.x += deltaY * 0.01;
+        rubikGroup.rotation.x -= deltaY * 0.01; // Inverted for natural feel
         controlState.lastMouse.set(x, y);
         return;
       }
@@ -1868,8 +1869,9 @@ function getCubeHTML(size) {
         cross.crossVectors(interactionState.startPlane.normal, axisVec);
 
         // The sign of the dot product determines rotation direction
+        // Inverted to match user drag direction
         const dotProduct = cross.dot(dragVec);
-        const direction = dotProduct > 0 ? 1 : -1;
+        const direction = dotProduct > 0 ? -1 : 1;
 
         animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
