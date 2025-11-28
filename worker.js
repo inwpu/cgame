@@ -1654,7 +1654,6 @@ function getCubeHTML(size) {
       renderer.domElement.addEventListener('mousedown', onMouseDown);
       renderer.domElement.addEventListener('mousemove', onMouseMove);
       renderer.domElement.addEventListener('mouseup', onMouseUp);
-      renderer.domElement.addEventListener('click', onCubeClick);
       renderer.domElement.addEventListener('touchstart', onTouchStart);
       renderer.domElement.addEventListener('touchmove', onTouchMove);
       renderer.domElement.addEventListener('touchend', onMouseUp);
@@ -1745,137 +1744,224 @@ function getCubeHTML(size) {
 
     let dragStartPos = { x: 0, y: 0 };
     let isMouseDown = false;
-    const DRAG_THRESHOLD = 5; // pixels
+    let isDraggingCube = false;
+    let isDraggingLayer = false;
+    let selectedCube = null;
+    let selectedFace = null;
+    let dragAxis = null;
+    const DRAG_THRESHOLD = 10; // pixels
 
     function onMouseDown(e) {
       isMouseDown = true;
-      isDragging = false;
+      isDraggingCube = false;
+      isDraggingLayer = false;
       dragStartPos = { x: e.clientX, y: e.clientY };
       previousMouse = { x: e.clientX, y: e.clientY };
+
+      // Check if clicking on a cube face
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(cubelets);
+
+      if (intersects.length > 0) {
+        selectedCube = intersects[0].object;
+        selectedFace = intersects[0].face;
+        dragAxis = null;
+      } else {
+        selectedCube = null;
+        selectedFace = null;
+      }
     }
 
     function onMouseMove(e) {
       if (!isMouseDown) return;
 
-      const deltaX = e.clientX - previousMouse.x;
-      const deltaY = e.clientY - previousMouse.y;
+      const deltaX = e.clientX - dragStartPos.x;
+      const deltaY = e.clientY - dragStartPos.y;
+      const totalDelta = Math.abs(deltaX) + Math.abs(deltaY);
 
-      // Check if moved enough to be considered dragging
-      const totalDelta = Math.abs(e.clientX - dragStartPos.x) + Math.abs(e.clientY - dragStartPos.y);
-      if (totalDelta > DRAG_THRESHOLD) {
-        isDragging = true;
+      // Determine if dragging cube or layer
+      if (totalDelta > DRAG_THRESHOLD && !isDraggingCube && !isDraggingLayer) {
+        if (selectedCube) {
+          // Dragging a layer
+          isDraggingLayer = true;
+
+          // Get face normal in world space
+          const normal = selectedFace.normal.clone();
+          normal.transformDirection(selectedCube.matrixWorld);
+
+          // Determine drag axis based on drag direction and face normal
+          const absDeltaX = Math.abs(deltaX);
+          const absDeltaY = Math.abs(deltaY);
+
+          // Get the two axes perpendicular to the normal
+          const absNormalX = Math.abs(normal.x);
+          const absNormalY = Math.abs(normal.y);
+          const absNormalZ = Math.abs(normal.z);
+
+          let rotationAxis, rotationLayer, rotationDirection;
+          const gridPos = selectedCube.userData.gridPos;
+
+          if (absNormalX > absNormalY && absNormalX > absNormalZ) {
+            // Normal is along X axis - can rotate Y or Z
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'z';
+              rotationLayer = gridPos.z;
+              rotationDirection = deltaY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
+            } else {
+              rotationAxis = 'y';
+              rotationLayer = gridPos.y;
+              rotationDirection = deltaX > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
+            }
+          } else if (absNormalY > absNormalX && absNormalY > absNormalZ) {
+            // Normal is along Y axis - can rotate X or Z
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'z';
+              rotationLayer = gridPos.z;
+              rotationDirection = deltaY > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
+            } else {
+              rotationAxis = 'x';
+              rotationLayer = gridPos.x;
+              rotationDirection = deltaX > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
+            }
+          } else {
+            // Normal is along Z axis - can rotate X or Y
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'y';
+              rotationLayer = gridPos.y;
+              rotationDirection = deltaY > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
+            } else {
+              rotationAxis = 'x';
+              rotationLayer = gridPos.x;
+              rotationDirection = deltaX > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
+            }
+          }
+
+          dragAxis = { axis: rotationAxis, layer: rotationLayer, direction: rotationDirection };
+          animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * rotationDirection);
+
+        } else {
+          // Dragging the whole cube
+          isDraggingCube = true;
+        }
       }
 
-      if (isDragging) {
-        rubikGroup.rotation.y += deltaX * 0.01;
-        rubikGroup.rotation.x += deltaY * 0.01;
+      if (isDraggingCube) {
+        const dx = e.clientX - previousMouse.x;
+        const dy = e.clientY - previousMouse.y;
+        rubikGroup.rotation.y += dx * 0.01;
+        rubikGroup.rotation.x += dy * 0.01;
       }
+
       previousMouse = { x: e.clientX, y: e.clientY };
     }
 
     function onMouseUp() {
       isMouseDown = false;
-      isDragging = false;
+      isDraggingCube = false;
+      isDraggingLayer = false;
+      selectedCube = null;
+      selectedFace = null;
+      dragAxis = null;
     }
 
     function onTouchStart(e) {
       if (e.touches.length === 1) {
-        isDragging = true;
-        previousMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        const touch = e.touches[0];
+        isMouseDown = true;
+        isDraggingCube = false;
+        isDraggingLayer = false;
+        dragStartPos = { x: touch.clientX, y: touch.clientY };
+        previousMouse = { x: touch.clientX, y: touch.clientY };
+
+        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(cubelets);
+
+        if (intersects.length > 0) {
+          selectedCube = intersects[0].object;
+          selectedFace = intersects[0].face;
+          dragAxis = null;
+        } else {
+          selectedCube = null;
+          selectedFace = null;
+        }
       }
     }
 
     function onTouchMove(e) {
-      if (!isDragging || e.touches.length !== 1) return;
-      const deltaX = e.touches[0].clientX - previousMouse.x;
-      const deltaY = e.touches[0].clientY - previousMouse.y;
-      rubikGroup.rotation.y += deltaX * 0.01;
-      rubikGroup.rotation.x += deltaY * 0.01;
-      previousMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      e.preventDefault();
-    }
+      if (!isMouseDown || e.touches.length !== 1) return;
 
-    function onCubeClick(event) {
-      if (isAnimating || isDragging) return;
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - dragStartPos.x;
+      const deltaY = touch.clientY - dragStartPos.y;
+      const totalDelta = Math.abs(deltaX) + Math.abs(deltaY);
 
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      if (totalDelta > DRAG_THRESHOLD && !isDraggingCube && !isDraggingLayer) {
+        if (selectedCube) {
+          isDraggingLayer = true;
+          const normal = selectedFace.normal.clone();
+          normal.transformDirection(selectedCube.matrixWorld);
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(cubelets);
+          const absDeltaX = Math.abs(deltaX);
+          const absDeltaY = Math.abs(deltaY);
+          const absNormalX = Math.abs(normal.x);
+          const absNormalY = Math.abs(normal.y);
+          const absNormalZ = Math.abs(normal.z);
 
-      if (intersects.length > 0) {
-        const clickedCube = intersects[0].object;
-        const intersect = intersects[0];
-        const normal = intersect.face.normal.clone();
-        const point = intersect.point.clone();
+          let rotationAxis, rotationLayer, rotationDirection;
+          const gridPos = selectedCube.userData.gridPos;
 
-        // Transform normal to world space
-        normal.transformDirection(clickedCube.matrixWorld);
-
-        // Get camera direction
-        const cameraDirection = new THREE.Vector3();
-        camera.getWorldDirection(cameraDirection);
-
-        // Determine which axis was clicked based on normal
-        const absX = Math.abs(normal.x);
-        const absY = Math.abs(normal.y);
-        const absZ = Math.abs(normal.z);
-
-        const gridPos = clickedCube.userData.gridPos;
-        let axis, layer, direction;
-
-        // Calculate which two axes are perpendicular to the clicked face
-        if (absX > absY && absX > absZ) {
-          // Clicked left/right face - can rotate around Y or Z
-          // Use click position to determine rotation axis
-          const cubeCenter = clickedCube.position;
-          const relativeY = point.y - cubeCenter.y;
-          const relativeZ = point.z - cubeCenter.z;
-
-          if (Math.abs(relativeY) > Math.abs(relativeZ)) {
-            axis = 'y';
-            layer = gridPos.y;
-            direction = relativeY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
+          if (absNormalX > absNormalY && absNormalX > absNormalZ) {
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'z';
+              rotationLayer = gridPos.z;
+              rotationDirection = deltaY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
+            } else {
+              rotationAxis = 'y';
+              rotationLayer = gridPos.y;
+              rotationDirection = deltaX > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
+            }
+          } else if (absNormalY > absNormalX && absNormalY > absNormalZ) {
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'z';
+              rotationLayer = gridPos.z;
+              rotationDirection = deltaY > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
+            } else {
+              rotationAxis = 'x';
+              rotationLayer = gridPos.x;
+              rotationDirection = deltaX > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
+            }
           } else {
-            axis = 'z';
-            layer = gridPos.z;
-            direction = relativeZ > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
+            if (absDeltaY > absDeltaX) {
+              rotationAxis = 'y';
+              rotationLayer = gridPos.y;
+              rotationDirection = deltaY > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
+            } else {
+              rotationAxis = 'x';
+              rotationLayer = gridPos.x;
+              rotationDirection = deltaX > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
+            }
           }
-        } else if (absY > absX && absY > absZ) {
-          // Clicked top/bottom face - can rotate around X or Z
-          const cubeCenter = clickedCube.position;
-          const relativeX = point.x - cubeCenter.x;
-          const relativeZ = point.z - cubeCenter.z;
 
-          if (Math.abs(relativeX) > Math.abs(relativeZ)) {
-            axis = 'x';
-            layer = gridPos.x;
-            direction = relativeX > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
-          } else {
-            axis = 'z';
-            layer = gridPos.z;
-            direction = relativeZ > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
-          }
+          dragAxis = { axis: rotationAxis, layer: rotationLayer, direction: rotationDirection };
+          animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * rotationDirection);
         } else {
-          // Clicked front/back face - can rotate around X or Y
-          const cubeCenter = clickedCube.position;
-          const relativeX = point.x - cubeCenter.x;
-          const relativeY = point.y - cubeCenter.y;
-
-          if (Math.abs(relativeX) > Math.abs(relativeY)) {
-            axis = 'x';
-            layer = gridPos.x;
-            direction = relativeX > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
-          } else {
-            axis = 'y';
-            layer = gridPos.y;
-            direction = relativeY > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
-          }
+          isDraggingCube = true;
         }
-
-        animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
+
+      if (isDraggingCube) {
+        const dx = touch.clientX - previousMouse.x;
+        const dy = touch.clientY - previousMouse.y;
+        rubikGroup.rotation.y += dx * 0.01;
+        rubikGroup.rotation.x += dy * 0.01;
+      }
+
+      previousMouse = { x: touch.clientX, y: touch.clientY };
+      e.preventDefault();
     }
 
     function animateRotation(axis, layer, angle) {
