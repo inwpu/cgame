@@ -1131,8 +1131,7 @@ function getCube5HTML() {
 }
 
 function getCubeHTML(size) {
-  const cameraZ = 10 + size * 1.5;
-  const scaleFactor = size / 3;
+  const scaleFactor = 1.0 + (size - 3) * 0.4;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1245,8 +1244,17 @@ function getCubeHTML(size) {
 
     function init() {
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.z = ${cameraZ};
+
+      // Responsive camera setup based on screen size
+      const aspect = window.innerWidth / window.innerHeight;
+      const baseFOV = 50;
+      const fov = window.innerWidth < 768 ? baseFOV + 10 : baseFOV;
+      camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 1000);
+
+      // Adjust camera distance based on screen size and cube size
+      const baseDistance = window.innerWidth < 768 ? 20 : 15;
+      const sizeMultiplier = SIZE / 3;
+      camera.position.z = baseDistance + (SIZE - 3) * 2;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
