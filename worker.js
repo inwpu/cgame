@@ -1131,8 +1131,8 @@ function getCube5HTML() {
 }
 
 function getCubeHTML(size) {
-  const cameraZ = 10;
-  const scaleFactor = 3 / size; // Keep total cube visual size constant
+  const cameraZ = 10 + size * 1.5;
+  const scaleFactor = size / 3;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
