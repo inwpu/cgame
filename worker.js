@@ -1599,7 +1599,6 @@ function getCubeHTML(size) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     let scene, camera, renderer, rubikGroup, cubelets = [];
-    let isDragging = false, previousMouse = { x: 0, y: 0 };
     let raycaster, mouse;
     const SIZE = ${size};
     const GAP = 0.05;
@@ -2007,7 +2006,7 @@ function getCubeHTML(size) {
 
     function animate() {
       requestAnimationFrame(animate);
-      if (!isDragging && !isAnimating) {
+      if (!isInteracting && !isDraggingWholeCube && !isAnimating) {
         rubikGroup.rotation.y += 0.003;
       }
       renderer.render(scene, camera);
