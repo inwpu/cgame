@@ -40,21 +40,29 @@ export default {
     }
     if (path === '/stats') return new Response(getStatsPageHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 
-    // Admin endpoint to migrate old data (add ?key=YOUR_SECRET for security in production)
-    if (path === '/admin/migrate-locations') {
-      const list = await env.VISITORS.list();
-      let migrated = 0;
-      for (const key of list.keys) {
-        if (key.name.startsWith('visitor:')) {
-          const data = JSON.parse(await env.VISITORS.get(key.name));
-          if (!data.location) {
-            data.location = 'Unknown (需要重新访问以更新)';
-            await env.VISITORS.put(key.name, JSON.stringify(data));
-            migrated++;
-          }
-        }
+    // Admin endpoint to clear all visitor data
+    if (path === '/admin/clear-all-data') {
+      if (!env.VISITORS) {
+        return new Response(JSON.stringify({ error: 'KV not configured' }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 500
+        });
       }
-      return new Response(JSON.stringify({ migrated, message: '旧数据已标记，等待访客重新访问时更新真实归属地' }), {
+
+      const list = await env.VISITORS.list();
+      let deleted = 0;
+
+      // Delete all visitor records
+      for (const key of list.keys) {
+        await env.VISITORS.delete(key.name);
+        deleted++;
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        deleted,
+        message: '所有访客数据已清空，计数器已重置为0'
+      }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
