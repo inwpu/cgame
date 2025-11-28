@@ -1606,6 +1606,28 @@ function getCubeHTML(size) {
     const cubeState = [];
     let isAnimating = false;
 
+    // Interaction state variables
+    let isInteracting = false;
+    let isDraggingWholeCube = false;
+    let intersectionPoint = null;
+    let intersectionPlane = null;
+    let selectedCubelet = null;
+    let possibleLayers = null;
+    let dragVector = new THREE.Vector3();
+    let rotationAxisVec = new THREE.Vector3();
+    let rotationDetermined = false;
+    let activeLayer = null;
+    let previousMouse = new THREE.Vector2();
+    const ROTATION_THRESHOLD = 5;
+
+    function snapToBasis(vec) {
+      const max = Math.max(Math.abs(vec.x), Math.abs(vec.y), Math.abs(vec.z));
+      vec.x = Math.abs(vec.x) === max ? Math.sign(vec.x) : 0;
+      vec.y = vec.x !== 0 ? 0 : (Math.abs(vec.y) === max ? Math.sign(vec.y) : 0);
+      vec.z = vec.x !== 0 || vec.y !== 0 ? 0 : Math.sign(vec.z);
+      return vec;
+    }
+
     function init() {
       scene = new THREE.Scene();
 
@@ -1741,27 +1763,6 @@ function getCubeHTML(size) {
       }
     }
 
-    let isInteracting = false;
-    let isDraggingWholeCube = false;
-    let intersectionPoint = null;
-    let intersectionPlane = null;
-    let selectedCubelet = null;
-    let possibleLayers = null;
-    let dragVector = new THREE.Vector3();
-    let rotationAxisVec = new THREE.Vector3();
-    let rotationDetermined = false;
-    let activeLayer = null;
-    let previousMouse = new THREE.Vector2();
-    const ROTATION_THRESHOLD = 5;
-
-    function snapToBasis(vec) {
-      const max = Math.max(Math.abs(vec.x), Math.abs(vec.y), Math.abs(vec.z));
-      vec.x = Math.abs(vec.x) === max ? Math.sign(vec.x) : 0;
-      vec.y = vec.x !== 0 ? 0 : (Math.abs(vec.y) === max ? Math.sign(vec.y) : 0);
-      vec.z = vec.x !== 0 || vec.y !== 0 ? 0 : Math.sign(vec.z);
-      return vec;
-    }
-
     function onMouseDown(e) {
       if (isAnimating) return;
 
@@ -1775,9 +1776,10 @@ function getCubeHTML(size) {
       const intersects = raycaster.intersectObjects(cubelets);
 
       if (intersects.length > 0) {
+        const intersect = intersects[0];
         isInteracting = true;
         rotationDetermined = false;
-        const intersect = intersects[0];
+        isDraggingWholeCube = false;
 
         selectedCubelet = intersect.object;
         intersectionPoint = intersect.point.clone();
@@ -1795,24 +1797,35 @@ function getCubeHTML(size) {
           z: gridPos.z
         };
       } else {
-        isDraggingWholeCube = true;
+        // Clicking on background - allow whole cube rotation
+        isInteracting = false;
+        isDraggingWholeCube = false;
+        selectedCubelet = null;
       }
     }
 
     function onMouseMove(e) {
-      if (!isInteracting && !isDraggingWholeCube) return;
-
       const x = e.clientX;
       const y = e.clientY;
 
+      // Calculate movement delta
+      const deltaX = x - previousMouse.x;
+      const deltaY = y - previousMouse.y;
+      const movement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+      // If not interacting with cube and moved enough, start dragging whole cube
+      if (!isInteracting && !isDraggingWholeCube && movement > 3) {
+        isDraggingWholeCube = true;
+      }
+
       if (isDraggingWholeCube) {
-        const deltaX = x - previousMouse.x;
-        const deltaY = y - previousMouse.y;
         rubikGroup.rotation.y += deltaX * 0.01;
         rubikGroup.rotation.x += deltaY * 0.01;
         previousMouse.set(x, y);
         return;
       }
+
+      if (!isInteracting) return;
 
       // Get current point on the intersection plane
       mouse.x = (x / window.innerWidth) * 2 - 1;
@@ -1820,9 +1833,12 @@ function getCubeHTML(size) {
       raycaster.setFromCamera(mouse, camera);
 
       const currentPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(intersectionPlane, currentPoint);
+      const intersected = raycaster.ray.intersectPlane(intersectionPlane, currentPoint);
 
-      if (!currentPoint) return;
+      if (!intersected) {
+        previousMouse.set(x, y);
+        return;
+      }
 
       // Calculate drag direction on plane
       dragVector.subVectors(currentPoint, intersectionPoint);
