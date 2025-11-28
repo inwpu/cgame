@@ -1813,9 +1813,13 @@ function getCubeHTML(size) {
       if (controlState.rotating) {
         const deltaX = x - controlState.lastMouse.x;
         const deltaY = y - controlState.lastMouse.y;
-        // Rotate in direction of mouse movement
-        rubikGroup.rotation.y -= deltaX * 0.01;
+
+        // Standard trackball rotation:
+        // Moving mouse right should rotate object right (decrease Y rotation)
+        // Moving mouse down should rotate object down (increase X rotation)
+        rubikGroup.rotation.y += deltaX * 0.01;
         rubikGroup.rotation.x -= deltaY * 0.01;
+
         controlState.lastMouse.set(x, y);
         return;
       }
