@@ -1742,127 +1742,136 @@ function getCubeHTML(size) {
       }
     }
 
-    let dragStartPos = new THREE.Vector2();
-    let currentPos = new THREE.Vector2();
-    let isMouseDown = false;
-    let isDraggingCube = false;
-    let selectedCube = null;
-    let selectedNormal = null;
+    let isInteracting = false;
+    let isDraggingWholeCube = false;
     let intersectionPoint = null;
-    let rotationAxis = null;
-    let rotationLayer = null;
-    let axisDetermined = false;
-    const DRAG_THRESHOLD = 5;
+    let intersectionPlane = null;
+    let selectedCubelet = null;
+    let possibleLayers = null;
+    let dragVector = new THREE.Vector3();
+    let rotationAxisVec = new THREE.Vector3();
+    let rotationDetermined = false;
+    let activeLayer = null;
+    let previousMouse = new THREE.Vector2();
+    const ROTATION_THRESHOLD = 5;
+
+    function snapToBasis(vec) {
+      const max = Math.max(Math.abs(vec.x), Math.abs(vec.y), Math.abs(vec.z));
+      vec.x = Math.abs(vec.x) === max ? Math.sign(vec.x) : 0;
+      vec.y = vec.x !== 0 ? 0 : (Math.abs(vec.y) === max ? Math.sign(vec.y) : 0);
+      vec.z = vec.x !== 0 || vec.y !== 0 ? 0 : Math.sign(vec.z);
+      return vec;
+    }
 
     function onMouseDown(e) {
       if (isAnimating) return;
 
-      isMouseDown = true;
-      isDraggingCube = false;
-      axisDetermined = false;
-
       const x = e.clientX;
       const y = e.clientY;
-      dragStartPos.set(x, y);
-      currentPos.set(x, y);
+      previousMouse.set(x, y);
 
-      // Raycast to check if clicking on cube
       mouse.x = (x / window.innerWidth) * 2 - 1;
       mouse.y = -(y / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(cubelets);
 
       if (intersects.length > 0) {
+        isInteracting = true;
+        rotationDetermined = false;
         const intersect = intersects[0];
-        selectedCube = intersect.object;
-        selectedNormal = intersect.face.normal.clone();
-        selectedNormal.transformDirection(selectedCube.matrixWorld);
+
+        selectedCubelet = intersect.object;
         intersectionPoint = intersect.point.clone();
+
+        // Create plane for tracking drag
+        const normal = intersect.face.normal.clone();
+        normal.transformDirection(selectedCubelet.matrixWorld);
+        intersectionPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, intersectionPoint);
+
+        // Store possible rotation layers
+        const gridPos = selectedCubelet.userData.gridPos;
+        possibleLayers = {
+          x: gridPos.x,
+          y: gridPos.y,
+          z: gridPos.z
+        };
       } else {
-        selectedCube = null;
-        selectedNormal = null;
-        intersectionPoint = null;
+        isDraggingWholeCube = true;
       }
     }
 
     function onMouseMove(e) {
-      if (!isMouseDown) return;
+      if (!isInteracting && !isDraggingWholeCube) return;
 
-      currentPos.set(e.clientX, e.clientY);
+      const x = e.clientX;
+      const y = e.clientY;
 
-      // Calculate drag direction
-      const dragVector = new THREE.Vector2();
-      dragVector.subVectors(currentPos, dragStartPos);
+      if (isDraggingWholeCube) {
+        const deltaX = x - previousMouse.x;
+        const deltaY = y - previousMouse.y;
+        rubikGroup.rotation.y += deltaX * 0.01;
+        rubikGroup.rotation.x += deltaY * 0.01;
+        previousMouse.set(x, y);
+        return;
+      }
+
+      // Get current point on the intersection plane
+      mouse.x = (x / window.innerWidth) * 2 - 1;
+      mouse.y = -(y / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const currentPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(intersectionPlane, currentPoint);
+
+      if (!currentPoint) return;
+
+      // Calculate drag direction on plane
+      dragVector.subVectors(currentPoint, intersectionPoint);
       const dragDistance = dragVector.length();
 
-      if (selectedCube && !axisDetermined && dragDistance > DRAG_THRESHOLD) {
-        // Determine rotation axis based on drag direction
-        axisDetermined = true;
+      if (!rotationDetermined && dragDistance > ROTATION_THRESHOLD * SCALE) {
+        rotationDetermined = true;
 
-        // Normalize drag direction in screen space
-        const screenDrag = new THREE.Vector3(dragVector.x, -dragVector.y, 0).normalize();
+        // Determine rotation axis: cross(planeNormal, dragDirection)
+        rotationAxisVec.crossVectors(intersectionPlane.normal, dragVector);
+        snapToBasis(rotationAxisVec);
 
-        // Get rotation axis by cross product of normal and screen drag
-        const axis3D = new THREE.Vector3();
-        axis3D.crossVectors(selectedNormal, screenDrag);
-
-        // Snap to nearest axis
-        const absX = Math.abs(axis3D.x);
-        const absY = Math.abs(axis3D.y);
-        const absZ = Math.abs(axis3D.z);
-
-        const gridPos = selectedCube.userData.gridPos;
-
-        if (absX > absY && absX > absZ) {
-          rotationAxis = 'x';
-          rotationLayer = gridPos.x;
-        } else if (absY > absX && absY > absZ) {
-          rotationAxis = 'y';
-          rotationLayer = gridPos.y;
+        // Determine which axis and layer
+        let axis, layer;
+        if (Math.abs(rotationAxisVec.x) === 1) {
+          axis = 'x';
+          layer = possibleLayers.x;
+        } else if (Math.abs(rotationAxisVec.y) === 1) {
+          axis = 'y';
+          layer = possibleLayers.y;
         } else {
-          rotationAxis = 'z';
-          rotationLayer = gridPos.z;
+          axis = 'z';
+          layer = possibleLayers.z;
         }
 
-        // Start rotation
-        const direction = determineDirection(rotationAxis, screenDrag, selectedNormal);
-        animateRotation(rotationAxis, rotationLayer, (Math.PI / 2) * direction);
-      } else if (!selectedCube) {
-        // Dragging whole cube
-        if (!isDraggingCube && dragDistance > DRAG_THRESHOLD) {
-          isDraggingCube = true;
-        }
+        // Determine direction
+        const axisVector = new THREE.Vector3();
+        axisVector[axis] = rotationAxisVec[axis];
 
-        if (isDraggingCube) {
-          const delta = new THREE.Vector2();
-          delta.subVectors(currentPos, new THREE.Vector2(previousMouse.x, previousMouse.y));
-          rubikGroup.rotation.y += delta.x * 0.01;
-          rubikGroup.rotation.x += delta.y * 0.01;
-        }
+        const crossCheck = new THREE.Vector3();
+        crossCheck.crossVectors(axisVector, intersectionPlane.normal);
+
+        const direction = crossCheck.dot(dragVector) > 0 ? 1 : -1;
+
+        animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
 
-      previousMouse = { x: e.clientX, y: e.clientY };
-    }
-
-    function determineDirection(axis, screenDrag, normal) {
-      // Determine rotation direction based on axis and drag direction
-      if (axis === 'x') {
-        return screenDrag.y * normal.x - screenDrag.x * normal.z > 0 ? 1 : -1;
-      } else if (axis === 'y') {
-        return screenDrag.x * normal.z - screenDrag.y * normal.x > 0 ? 1 : -1;
-      } else { // z
-        return screenDrag.y * normal.x + screenDrag.x * normal.y > 0 ? 1 : -1;
-      }
+      previousMouse.set(x, y);
     }
 
     function onMouseUp() {
-      isMouseDown = false;
-      isDraggingCube = false;
-      axisDetermined = false;
-      selectedCube = null;
-      selectedNormal = null;
-      rotationAxis = null;
-      rotationLayer = null;
+      isInteracting = false;
+      isDraggingWholeCube = false;
+      rotationDetermined = false;
+      selectedCubelet = null;
+      intersectionPoint = null;
+      intersectionPlane = null;
+      activeLayer = null;
     }
 
     function onTouchStart(e) {
