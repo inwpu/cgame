@@ -1597,7 +1597,7 @@ function getCubeHTML(size) {
   <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
+    <script>
     let scene, camera, renderer, rubikGroup, cubelets = [];
     let raycaster, mouse;
     const SIZE = ${size};
@@ -1616,13 +1616,12 @@ function getCubeHTML(size) {
       axisDetermined: false,
       rotationAxis: null,
       rotationLayer: null,
-      startTime: 0
+      startTime: 0,
+      mode: null // 'orbit' 整体旋转, 'slice' 层旋转
     };
 
     let controlState = {
-      rotating: false,
-      lastMouse: new THREE.Vector2(),
-      velocity: new THREE.Vector2()
+      lastMouse: new THREE.Vector2()
     };
 
     function snapToBasis(vec) {
@@ -1644,7 +1643,6 @@ function getCubeHTML(size) {
 
       // Adjust camera distance based on screen size and cube size
       const baseDistance = window.innerWidth < 768 ? 20 : 15;
-      const sizeMultiplier = SIZE / 3;
       camera.position.z = baseDistance + (SIZE - 3) * 2;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -1680,25 +1678,25 @@ function getCubeHTML(size) {
       renderer.domElement.addEventListener('mousedown', onMouseDown);
       renderer.domElement.addEventListener('mousemove', onMouseMove);
       renderer.domElement.addEventListener('mouseup', onMouseUp);
-      renderer.domElement.addEventListener('touchstart', onTouchStart);
-      renderer.domElement.addEventListener('touchmove', onTouchMove);
+
+      renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+      renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
       renderer.domElement.addEventListener('touchend', onMouseUp);
 
       animate();
     }
-
+    
     function createRubiksCube() {
       // Security conferences with their brand colors
       const faces = [
         { name: 'IEEE S&P', color: '#003f87', textColor: '#ffffff' },  // IEEE Blue
-        { name: 'USENIX', color: '#8B0000', textColor: '#ffffff' },    // Dark Red
-        { name: 'CCS', color: '#2E8B57', textColor: '#ffffff' },       // Sea Green
-        { name: 'NDSS', color: '#FF8C00', textColor: '#000000' },      // Dark Orange
+        { name: 'USENIX',   color: '#8B0000', textColor: '#ffffff' },  // Dark Red
+        { name: 'CCS',      color: '#2E8B57', textColor: '#ffffff' },  // Sea Green
+        { name: 'NDSS',     color: '#FF8C00', textColor: '#000000' },  // Dark Orange
         { name: 'BlackHat', color: '#33CEFF', textColor: '#000000' },  // Official Dodger Blue
-        { name: 'DEFCON', color: '#4477AA', textColor: '#ffffff' }     // Official Blue-Purple
+        { name: 'DEFCON',   color: '#4477AA', textColor: '#ffffff' }   // Official Blue-Purple
       ];
 
-      // Calculate font size based on cube size to maintain readability
       const fontSize = Math.floor(48 / (SIZE / 3));
 
       for (let x = 0; x < SIZE; x++) {
@@ -1706,29 +1704,24 @@ function getCubeHTML(size) {
           for (let z = 0; z < SIZE; z++) {
             const geometry = new THREE.BoxGeometry(0.95 * SCALE, 0.95 * SCALE, 0.95 * SCALE);
 
-            // Create materials with text for each face
-            const materials = faces.map((face, faceIndex) => {
+            const materials = faces.map(function(face) {
               const canvas = document.createElement('canvas');
               canvas.width = 512;
               canvas.height = 512;
               const context = canvas.getContext('2d');
 
-              // Enable high quality rendering
               context.imageSmoothingEnabled = true;
               context.imageSmoothingQuality = 'high';
 
-              // Background
               context.fillStyle = face.color;
               context.fillRect(0, 0, 512, 512);
 
-              // Text
               context.fillStyle = face.textColor;
-              context.font = \`bold \${fontSize * 2}px Arial, sans-serif\`;
+              context.font = 'bold ' + (fontSize * 2) + 'px Arial, sans-serif';
               context.textAlign = 'center';
               context.textBaseline = 'middle';
               context.fillText(face.name, 256, 256);
 
-              // Border
               context.strokeStyle = face.textColor;
               context.lineWidth = 8;
               context.strokeRect(4, 4, 504, 504);
@@ -1757,12 +1750,12 @@ function getCubeHTML(size) {
             cube.userData = {
               initPos: new THREE.Vector3(posX, posY, posZ),
               initRot: new THREE.Euler(0, 0, 0),
-              gridPos: { x, y, z }
+              gridPos: { x: x, y: y, z: z }
             };
 
             rubikGroup.add(cube);
             cubelets.push(cube);
-            cubeState.push({ x, y, z });
+            cubeState.push({ x: x, y: y, z: z });
           }
         }
       }
@@ -1780,27 +1773,22 @@ function getCubeHTML(size) {
       const intersects = raycaster.intersectObjects(cubelets);
 
       if (intersects.length > 0) {
-        // Interacting with cube
         const intersect = intersects[0];
         interactionState.active = true;
         interactionState.axisDetermined = false;
         interactionState.selectedCube = intersect.object;
         interactionState.startPoint = intersect.point.clone();
         interactionState.startTime = Date.now();
+        interactionState.mode = 'slice';
 
-        // Create plane from intersected face
         const normal = intersect.face.normal.clone();
         normal.transformDirection(intersect.object.matrixWorld);
         interactionState.startPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, intersect.point);
 
-        // Store possible layers
         const gridPos = intersect.object.userData.gridPos;
         interactionState.possibleLayers = { x: gridPos.x, y: gridPos.y, z: gridPos.z };
-
-        controlState.rotating = false;
       } else {
-        // Interacting with background - rotate whole cube
-        controlState.rotating = true;
+        interactionState.mode = 'orbit';
         controlState.lastMouse.set(x, y);
       }
     }
@@ -1809,21 +1797,20 @@ function getCubeHTML(size) {
       const x = e.clientX;
       const y = e.clientY;
 
-      // handle whole cube rotation
-      if (controlState.rotating) {
-            const deltaX = x - controlState.lastMouse.x;
-            const deltaY = y - controlState.lastMouse.y;
+      if (interactionState.mode === 'orbit') {
+        const deltaX = x - controlState.lastMouse.x;
+        const deltaY = y - controlState.lastMouse.y;
 
-            const ROTATE_SPEED = 0.01;
+        const ROTATE_SPEED = 0.01;
 
-            rubikGroup.rotation.y -= deltaX * ROTATE_SPEED;
-            rubikGroup.rotation.x -= deltaY * ROTATE_SPEED;
-            controlState.lastMouse.set(x, y);
-            return;
-          }
+        rubikGroup.rotation.y += deltaX * ROTATE_SPEED;
+        rubikGroup.rotation.x += deltaY * ROTATE_SPEED;
 
-      // Handle layer rotation
-      if (!interactionState.active) return;
+        controlState.lastMouse.set(x, y);
+        return;
+      }
+
+      if (!interactionState.active || interactionState.mode !== 'slice') return;
 
       mouse.x = (x / window.innerWidth) * 2 - 1;
       mouse.y = -(y / window.innerHeight) * 2 + 1;
@@ -1833,20 +1820,16 @@ function getCubeHTML(size) {
       raycaster.ray.intersectPlane(interactionState.startPlane, currentPoint);
       if (!currentPoint) return;
 
-      // Calculate drag direction on the plane
       const dragVec = new THREE.Vector3().subVectors(currentPoint, interactionState.startPoint);
       const dragDist = dragVec.length();
 
-      // Determine axis when drag distance is sufficient
       if (!interactionState.axisDetermined && dragDist > 0.1 * SCALE) {
         interactionState.axisDetermined = true;
 
-        // Calculate rotation axis: plane normal × drag direction
         const axis3D = new THREE.Vector3();
         axis3D.crossVectors(interactionState.startPlane.normal, dragVec);
         snapToBasis(axis3D);
 
-        // Determine which axis
         let axis, layer;
         if (Math.abs(axis3D.x) === 1) {
           axis = 'x';
@@ -1862,16 +1845,12 @@ function getCubeHTML(size) {
         interactionState.rotationAxis = axis;
         interactionState.rotationLayer = layer;
 
-        // Determine rotation direction
-        // The cross vector tells us the positive rotation direction
         const axisVec = new THREE.Vector3();
         axisVec[axis] = axis3D[axis];
 
         const cross = new THREE.Vector3();
         cross.crossVectors(interactionState.startPlane.normal, axisVec);
 
-        // The sign of the dot product determines rotation direction
-        // Inverted to match user drag direction
         const dotProduct = cross.dot(dragVec);
         const direction = dotProduct > 0 ? 1 : -1;
 
@@ -1880,7 +1859,6 @@ function getCubeHTML(size) {
     }
 
     function onMouseUp() {
-      // Reset interaction state
       interactionState.active = false;
       interactionState.axisDetermined = false;
       interactionState.selectedCube = null;
@@ -1889,9 +1867,7 @@ function getCubeHTML(size) {
       interactionState.possibleLayers = null;
       interactionState.rotationAxis = null;
       interactionState.rotationLayer = null;
-
-      // Reset control state
-      controlState.rotating = false;
+      interactionState.mode = null;
     }
 
     function onTouchStart(e) {
@@ -1918,7 +1894,7 @@ function getCubeHTML(size) {
       rubikGroup.add(layerGroup);
 
       const cubesToRotate = [];
-      cubelets.forEach(cube => {
+      cubelets.forEach(function(cube) {
         const pos = cube.userData.gridPos;
         let shouldRotate = false;
 
@@ -1944,7 +1920,7 @@ function getCubeHTML(size) {
           requestAnimationFrame(rotateStep);
         } else {
           // Update grid positions based on rotation
-          cubesToRotate.forEach(cube => {
+          cubesToRotate.forEach(function(cube) {
             THREE.SceneUtils.attach(cube, layerGroup, rubikGroup);
 
             const pos = cube.userData.gridPos;
@@ -2015,13 +1991,13 @@ function getCubeHTML(size) {
 
     function solveCube() {
       if (isAnimating) return;
-      cubelets.forEach((cube, idx) => {
+      cubelets.forEach(function(cube, idx) {
         cube.position.copy(cube.userData.initPos);
         cube.rotation.copy(cube.userData.initRot);
         const x = Math.floor(idx / (SIZE * SIZE));
         const y = Math.floor((idx % (SIZE * SIZE)) / SIZE);
         const z = idx % SIZE;
-        cube.userData.gridPos = { x, y, z };
+        cube.userData.gridPos = { x: x, y: y, z: z };
       });
     }
 
@@ -2031,7 +2007,7 @@ function getCubeHTML(size) {
       renderer.render(scene, camera);
     }
 
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', function() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
