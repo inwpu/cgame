@@ -6,8 +6,11 @@ export default {
     const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
     const userAgent = request.headers.get('User-Agent') || 'unknown';
     const fingerprint = await generateFingerprint(clientIP, userAgent);
+    const country = request.cf?.country || 'Unknown';
+    const city = request.cf?.city || '';
+    const location = city ? `${city}, ${country}` : country;
 
-    await trackVisitor(env, clientIP, fingerprint, userAgent);
+    await trackVisitor(env, clientIP, fingerprint, userAgent, location);
 
     if (path === '/') return new Response(getIndexHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     if (path === '/slime') return new Response(getSlimeHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
@@ -19,7 +22,7 @@ export default {
     if (path === '/cube4') return new Response(getCube4HTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     if (path === '/cube5') return new Response(getCube5HTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     if (path === '/api/stats') {
-      const stats = await getStats(env);
+      const stats = await getStats(env, request);
       return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
     }
     if (path === '/api/current') {
@@ -40,14 +43,14 @@ async function generateFingerprint(ip, ua) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
 }
 
-async function trackVisitor(env, ip, fingerprint, ua) {
+async function trackVisitor(env, ip, fingerprint, ua, location) {
   if (!env.VISITORS) return;
 
   const key = `visitor:${fingerprint}`;
   const existing = await env.VISITORS.get(key);
 
   if (!existing) {
-    await env.VISITORS.put(key, JSON.stringify({ ip, ua, first: Date.now(), count: 1 }));
+    await env.VISITORS.put(key, JSON.stringify({ ip, ua, location, first: Date.now(), count: 1 }));
     const totalVisitors = parseInt((await env.VISITORS.get('total_visitors')) || '0');
     await env.VISITORS.put('total_visitors', String(totalVisitors + 1));
 
@@ -57,6 +60,7 @@ async function trackVisitor(env, ip, fingerprint, ua) {
     const data = JSON.parse(existing);
     data.count++;
     data.last = Date.now();
+    data.location = location; // Update location
     await env.VISITORS.put(key, JSON.stringify(data));
 
     const totalVisits = parseInt((await env.VISITORS.get('total_visits')) || '0');
@@ -64,7 +68,7 @@ async function trackVisitor(env, ip, fingerprint, ua) {
   }
 }
 
-async function getStats(env) {
+async function getStats(env, request) {
   if (!env.VISITORS) return { visitors: 0, visits: 0, ips: [] };
 
   const visitors = parseInt((await env.VISITORS.get('total_visitors')) || '0');
@@ -79,12 +83,16 @@ async function getStats(env) {
       const data = JSON.parse(await env.VISITORS.get(key.name));
       if (!seen.has(data.ip)) {
         seen.add(data.ip);
-        ips.push({ ip: data.ip, count: data.count });
+        ips.push({
+          ip: data.ip,
+          count: data.count,
+          location: data.location || 'Unknown'
+        });
       }
     }
   }
 
-  return { visitors, visits, ips: ips.slice(0, 10) };
+  return { visitors, visits, ips };
 }
 
 function getStatsFloatScript() {
@@ -92,16 +100,18 @@ function getStatsFloatScript() {
     fetch('/api/current').then(r => r.json()).then(data => {
       const statsEl = document.getElementById('stats');
       if (statsEl) {
-        statsEl.innerHTML = \\\`
-          <div><strong>YOUR INFO</strong></div>
-          <div>IP: \\\${data.ip}</div>
-          <div>Fingerprint: \\\${data.fingerprint}</div>
-          <a href="/stats" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid #ddd;text-align:center;color:#0066cc;text-decoration:none;font-size:10px;">查看完整统计 →</a>
-        \\\`;
+        statsEl.innerHTML = '<div><strong>YOUR INFO</strong></div>' +
+          '<div>IP: ' + data.ip + '</div>' +
+          '<div>Fingerprint: ' + data.fingerprint + '</div>' +
+          '<a href="/stats" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid #ddd;text-align:center;color:#0066cc;text-decoration:none;font-size:10px;">查看完整统计 →</a>';
         setTimeout(() => {
           statsEl.classList.add('hidden');
         }, 10000);
       }
+    }).catch(err => {
+      console.error('Failed to load stats:', err);
+      const statsEl = document.getElementById('stats');
+      if (statsEl) statsEl.innerHTML = '<div>加载失败</div>';
     });
   `;
 }
@@ -394,6 +404,11 @@ function getIndexHTML() {
     <footer>
       © 2025 · Stress Relief Research Initiative
     </footer>
+
+    <div style="margin-top: 60px; padding-top: 40px; border-top: 1px solid #ddd;">
+      <h2 style="font-size: 1.5em; font-weight: 400; margin-bottom: 20px;">评论区</h2>
+      <div class="giscus"></div>
+    </div>
   </div>
   <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
@@ -411,6 +426,21 @@ function getIndexHTML() {
         document.getElementById('stats').classList.add('hidden');
       }, 10000);
     });
+  </script>
+  <script src="https://giscus.app/client.js"
+        data-repo="inwpu/cgame"
+        data-repo-id="R_kgDOQciOGQ"
+        data-category="General"
+        data-category-id="DIC_kwDOQciOGc4Cy_W7"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="light"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
   </script>
 </body>
 </html>`;
@@ -1092,8 +1122,30 @@ function getBreathingHTML() {
                        background: rgba(255,255,255,0.15); color: white; cursor: pointer;
                        backdrop-filter: blur(10px); transition: all 0.3s; }
     .controls button:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
-    .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; width: 100vw; height: 100vh; }
-    .cell { transition: background-color 0.5s ease, transform 0.3s ease, filter 0.3s ease; }
+    .grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; width: 100vw; height: 100vh; padding: 3px; }
+    .cell {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 4px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    .cell::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s ease, height 0.6s ease;
+    }
+    .cell:hover::before {
+      width: 100%;
+      height: 100%;
+    }
     .stats {
       position: fixed;
       bottom: 20px;
@@ -1134,22 +1186,23 @@ function getBreathingHTML() {
 
     let mouseX = -1, mouseY = -1;
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 64; i++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
-      cell.dataset.speed = 0.5 + Math.random() * 2;
+      cell.dataset.speed = 0.3 + Math.random() * 1.5;
       cell.dataset.offset = Math.random() * Math.PI * 2;
+      cell.dataset.index = i;
       grid.appendChild(cell);
       cells.push(cell);
 
-      // Add mouse interaction
+      // Add mouse interaction with ripple effect
       cell.addEventListener('mouseenter', function() {
-        this.style.transform = 'scale(1.1)';
-        this.style.filter = 'brightness(1.5)';
+        this.style.transform = 'scale(1.05)';
+        this.style.boxShadow = '0 0 30px rgba(255,255,255,0.6), inset 0 0 20px rgba(0,0,0,0.3)';
       });
       cell.addEventListener('mouseleave', function() {
         this.style.transform = 'scale(1)';
-        this.style.filter = 'brightness(1)';
+        this.style.boxShadow = 'inset 0 0 20px rgba(0,0,0,0.3)';
       });
     }
 
@@ -1183,18 +1236,27 @@ function getBreathingHTML() {
         const maxDist = 300;
         const proximity = Math.max(0, 1 - dist / maxDist);
 
-        // Brightness affected by time and mouse proximity
-        const baseBrightness = 30 + Math.sin(time * speed + offset) * 20 + 30;
-        const brightness = baseBrightness + proximity * 30;
+        // Enhanced breathing effect with wave propagation
+        const wave = Math.sin(time * 0.5 + i * 0.15) * 0.5 + 0.5;
+        const breathe = Math.sin(time * speed + offset);
+        const baseBrightness = 40 + breathe * 25;
+        const brightness = baseBrightness + proximity * 20 + wave * 15;
 
-        let hue;
+        let hue, saturation;
         if (currentTheme === 'rainbow') {
-          hue = (time * 30 + i * 12 + proximity * 60) % 360;
+          hue = (time * 20 + i * 5.625 + proximity * 40) % 360;
+          saturation = 75 + proximity * 20 + wave * 10;
         } else {
-          hue = theme.base + Math.sin(time * speed + offset) * theme.range / 2 + proximity * 30;
+          hue = theme.base + Math.sin(time * speed + offset) * theme.range / 2 + proximity * 25;
+          saturation = 70 + proximity * 25 + breathe * 15;
         }
 
-        cell.style.backgroundColor = \`hsl(\${hue}, \${70 + proximity * 30}%, \${brightness}%)\`;
+        cell.style.backgroundColor = \`hsl(\${hue}, \${saturation}%, \${brightness}%)\`;
+
+        // Add subtle glow effect
+        if (proximity > 0.3) {
+          cell.style.boxShadow = \`0 0 \${20 + proximity * 30}px hsla(\${hue}, \${saturation}%, \${brightness}%, 0.6), inset 0 0 20px rgba(0,0,0,0.3)\`;
+        }
       });
 
       requestAnimationFrame(animate);
@@ -1350,17 +1412,18 @@ function getStatsPageHTML() {
       </div>
     </div>
 
-    <div class="section-title">IP访问排名</div>
+    <div class="section-title">IP访问排名（共 <span id="totalIPs">-</span> 个独立IP）</div>
     <table id="statsTable">
       <thead>
         <tr>
           <th style="width: 80px;">排名</th>
           <th>IP地址</th>
+          <th style="width: 200px;">归属地</th>
           <th style="width: 120px;">访问次数</th>
         </tr>
       </thead>
       <tbody id="statsBody">
-        <tr><td colspan="3" class="loading">加载中...</td></tr>
+        <tr><td colspan="4" class="loading">加载中...</td></tr>
       </tbody>
     </table>
   </div>
@@ -1369,10 +1432,11 @@ function getStatsPageHTML() {
     fetch('/api/stats').then(r => r.json()).then(data => {
       document.getElementById('totalVisitors').textContent = data.visitors;
       document.getElementById('totalViews').textContent = data.visits;
+      document.getElementById('totalIPs').textContent = data.ips.length;
 
       const tbody = document.getElementById('statsBody');
       if (data.ips.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="loading">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">暂无数据</td></tr>';
         return;
       }
 
@@ -1386,12 +1450,13 @@ function getStatsPageHTML() {
           <tr>
             <td class="\${rankClass}">#\${rank}</td>
             <td class="ip-cell">\${item.ip}</td>
+            <td>\${item.location || 'Unknown'}</td>
             <td>\${item.count}</td>
           </tr>
         \`;
       }).join('');
     }).catch(err => {
-      document.getElementById('statsBody').innerHTML = '<tr><td colspan="3" class="loading">加载失败</td></tr>';
+      document.getElementById('statsBody').innerHTML = '<tr><td colspan="4" class="loading">加载失败</td></tr>';
     });
   </script>
 </body>
@@ -1657,15 +1722,19 @@ function getCubeHTML(size) {
     }
 
     let dragStartPos = { x: 0, y: 0 };
+    let isMouseDown = false;
     const DRAG_THRESHOLD = 5; // pixels
 
     function onMouseDown(e) {
+      isMouseDown = true;
       isDragging = false;
       dragStartPos = { x: e.clientX, y: e.clientY };
       previousMouse = { x: e.clientX, y: e.clientY };
     }
 
     function onMouseMove(e) {
+      if (!isMouseDown) return;
+
       const deltaX = e.clientX - previousMouse.x;
       const deltaY = e.clientY - previousMouse.y;
 
@@ -1683,6 +1752,7 @@ function getCubeHTML(size) {
     }
 
     function onMouseUp() {
+      isMouseDown = false;
       isDragging = false;
     }
 
