@@ -1809,21 +1809,18 @@ function getCubeHTML(size) {
       const x = e.clientX;
       const y = e.clientY;
 
-      // Handle whole cube rotation
+      // handle whole cube rotation
       if (controlState.rotating) {
-        const deltaX = x - controlState.lastMouse.x;
-        const deltaY = y - controlState.lastMouse.y;
+            const deltaX = x - controlState.lastMouse.x;
+            const deltaY = y - controlState.lastMouse.y;
 
-        // Standard trackball rotation:
-        // Moving mouse right should rotate object right (decrease Y rotation)
-        // Moving mouse down should rotate object down (increase X rotation)
-        rubikGroup.rotation.y += deltaX * 0.01;
-        rubikGroup.rotation.x -= deltaY * 0.01;
+            const ROTATE_SPEED = 0.01;
 
-        controlState.lastMouse.set(x, y);
-        return;
-      }
-
+            rubikGroup.rotation.x += deltaY * ROTATE_SPEED;
+            controlState.lastMouse.set(x, y);
+            return;
+          }
+            
       // Handle layer rotation
       if (!interactionState.active) return;
 
