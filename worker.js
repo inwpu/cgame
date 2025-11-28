@@ -26,9 +26,38 @@ export default {
       return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
     }
     if (path === '/api/current') {
-      return new Response(JSON.stringify({ ip: clientIP, fingerprint }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({
+        ip: clientIP,
+        fingerprint,
+        location,
+        cf: request.cf ? {
+          country: request.cf.country,
+          city: request.cf.city,
+          region: request.cf.region,
+          timezone: request.cf.timezone
+        } : null
+      }), { headers: { 'Content-Type': 'application/json' } });
     }
     if (path === '/stats') return new Response(getStatsPageHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+
+    // Admin endpoint to migrate old data (add ?key=YOUR_SECRET for security in production)
+    if (path === '/admin/migrate-locations') {
+      const list = await env.VISITORS.list();
+      let migrated = 0;
+      for (const key of list.keys) {
+        if (key.name.startsWith('visitor:')) {
+          const data = JSON.parse(await env.VISITORS.get(key.name));
+          if (!data.location) {
+            data.location = 'Unknown (需要重新访问以更新)';
+            await env.VISITORS.put(key.name, JSON.stringify(data));
+            migrated++;
+          }
+        }
+      }
+      return new Response(JSON.stringify({ migrated, message: '旧数据已标记，等待访客重新访问时更新真实归属地' }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     return new Response('Not Found', { status: 404 });
   }
@@ -50,7 +79,13 @@ async function trackVisitor(env, ip, fingerprint, ua, location) {
   const existing = await env.VISITORS.get(key);
 
   if (!existing) {
-    await env.VISITORS.put(key, JSON.stringify({ ip, ua, location, first: Date.now(), count: 1 }));
+    await env.VISITORS.put(key, JSON.stringify({
+      ip,
+      ua,
+      location: location || 'Unknown',
+      first: Date.now(),
+      count: 1
+    }));
     const totalVisitors = parseInt((await env.VISITORS.get('total_visitors')) || '0');
     await env.VISITORS.put('total_visitors', String(totalVisitors + 1));
 
@@ -60,7 +95,10 @@ async function trackVisitor(env, ip, fingerprint, ua, location) {
     const data = JSON.parse(existing);
     data.count++;
     data.last = Date.now();
-    data.location = location; // Update location
+    // Always update location (handles old data migration)
+    if (!data.location || data.location === 'Unknown') {
+      data.location = location || 'Unknown';
+    }
     await env.VISITORS.put(key, JSON.stringify(data));
 
     const totalVisits = parseInt((await env.VISITORS.get('total_visits')) || '0');
