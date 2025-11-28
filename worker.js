@@ -1,3 +1,61 @@
+const BOT_KEYWORDS = [
+  'bot',
+  'spider',
+  'crawler',
+  'scrapy',
+  'spinn3r',
+  'python-requests',
+  'axios',
+  'curl',
+  'wget',
+  'httpclient',
+  'java/',
+  'go-http-client',
+  'okhttp',
+  'libwww',
+  'httpunit',
+  'perl',
+  'php',
+  'ruby',
+  'node-fetch',
+  'aiohttp',
+  'okhttp'
+];
+
+const BLOCKED_IPS = new Set([
+  '112.112.212.50',
+  '171.116.201.39',
+  '121.29.178.25',
+  '121.29.178.181',
+  '123.245.84.83',
+  '111.224.221.252',
+  '59.52.37.27',
+  '175.30.48.163'
+]);
+
+const BROWSER_TOKENS = [
+  'mozilla/',
+  'chrome/',
+  'safari/',
+  'firefox/',
+  'edg/',
+  'opr/',
+];
+
+function isBotUserAgent(ua) {
+  if (!ua) return true;  
+
+  const s = ua.toLowerCase();
+  const looksLikeBrowser = BROWSER_TOKENS.some(t => s.includes(t));
+  const matchesBot = BOT_KEYWORDS.some(k => s.includes(k));
+
+  if (matchesBot || !looksLikeBrowser) {
+    return true;
+  }
+
+  return false;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -5,6 +63,11 @@ export default {
 
     const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
     const userAgent = request.headers.get('User-Agent') || 'unknown';
+    // ——【核心逻辑】禁止爬虫 & 禁止恶意 IP ——
+    if (BLOCKED_IPS.has(clientIP) || isBotUserAgent(userAgent)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
     const fingerprint = await generateFingerprint(clientIP, userAgent);
     const country = request.cf?.country || 'Unknown';
     const city = request.cf?.city || '';
