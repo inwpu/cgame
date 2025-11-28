@@ -10,7 +10,10 @@ export default {
     const city = request.cf?.city || '';
     const location = city ? `${city}, ${country}` : country;
 
-    await trackVisitor(env, clientIP, fingerprint, userAgent, location);
+    // Only track on page requests, not API calls
+    if (!path.startsWith('/api/')) {
+      await trackVisitor(env, clientIP, fingerprint, userAgent, location);
+    }
 
     if (path === '/') return new Response(getIndexHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     if (path === '/slime') return new Response(getSlimeHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
@@ -39,33 +42,6 @@ export default {
       }), { headers: { 'Content-Type': 'application/json' } });
     }
     if (path === '/stats') return new Response(getStatsPageHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
-
-    // Admin endpoint to clear all visitor data
-    if (path === '/admin/clear-all-data') {
-      if (!env.VISITORS) {
-        return new Response(JSON.stringify({ error: 'KV not configured' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 500
-        });
-      }
-
-      const list = await env.VISITORS.list();
-      let deleted = 0;
-
-      // Delete all visitor records
-      for (const key of list.keys) {
-        await env.VISITORS.delete(key.name);
-        deleted++;
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        deleted,
-        message: '所有访客数据已清空，计数器已重置为0'
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     return new Response('Not Found', { status: 404 });
   }
