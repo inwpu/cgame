@@ -1816,11 +1816,12 @@ function getCubeHTML(size) {
 
             const ROTATE_SPEED = 0.01;
 
-            rubikGroup.rotation.x += deltaY * ROTATE_SPEED;
+            rubikGroup.rotation.y -= deltaX * ROTATE_SPEED;
+            rubikGroup.rotation.x -= deltaY * ROTATE_SPEED;
             controlState.lastMouse.set(x, y);
             return;
           }
-            
+
       // Handle layer rotation
       if (!interactionState.active) return;
 
@@ -1872,7 +1873,7 @@ function getCubeHTML(size) {
         // The sign of the dot product determines rotation direction
         // Inverted to match user drag direction
         const dotProduct = cross.dot(dragVec);
-        const direction = dotProduct > 0 ? -1 : 1;
+        const direction = dotProduct > 0 ? 1 : -1;
 
         animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
