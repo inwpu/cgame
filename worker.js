@@ -1665,12 +1665,12 @@ function getCubeHTML(size) {
     function createRubiksCube() {
       // Security conferences with their brand colors
       const faces = [
-        { name: 'IEEE S&P', color: '#003f87', textColor: '#ffffff' }, // IEEE Blue
-        { name: 'USENIX', color: '#8B0000', textColor: '#ffffff' },   // Dark Red
-        { name: 'CCS', color: '#2E8B57', textColor: '#ffffff' },      // Sea Green
-        { name: 'NDSS', color: '#FF8C00', textColor: '#000000' },     // Dark Orange
-        { name: 'BlackHat', color: '#000000', textColor: '#ffffff' }, // Black
-        { name: 'DEFCON', color: '#FF0000', textColor: '#ffffff' }    // Red
+        { name: 'IEEE S&P', color: '#003f87', textColor: '#ffffff' },  // IEEE Blue
+        { name: 'USENIX', color: '#8B0000', textColor: '#ffffff' },    // Dark Red
+        { name: 'CCS', color: '#2E8B57', textColor: '#ffffff' },       // Sea Green
+        { name: 'NDSS', color: '#FF8C00', textColor: '#000000' },      // Dark Orange
+        { name: 'BlackHat', color: '#33CEFF', textColor: '#000000' },  // Official Dodger Blue
+        { name: 'DEFCON', color: '#4477AA', textColor: '#ffffff' }     // Official Blue-Purple
       ];
 
       // Calculate font size based on cube size to maintain readability
@@ -1808,9 +1808,14 @@ function getCubeHTML(size) {
         const clickedCube = intersects[0].object;
         const intersect = intersects[0];
         const normal = intersect.face.normal.clone();
+        const point = intersect.point.clone();
 
         // Transform normal to world space
         normal.transformDirection(clickedCube.matrixWorld);
+
+        // Get camera direction
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
 
         // Determine which axis was clicked based on normal
         const absX = Math.abs(normal.x);
@@ -1820,21 +1825,53 @@ function getCubeHTML(size) {
         const gridPos = clickedCube.userData.gridPos;
         let axis, layer, direction;
 
+        // Calculate which two axes are perpendicular to the clicked face
         if (absX > absY && absX > absZ) {
-          // X axis (left/right face)
-          axis = 'x';
-          layer = gridPos.x;
-          direction = normal.x > 0 ? 1 : -1;
+          // Clicked left/right face - can rotate around Y or Z
+          // Use click position to determine rotation axis
+          const cubeCenter = clickedCube.position;
+          const relativeY = point.y - cubeCenter.y;
+          const relativeZ = point.z - cubeCenter.z;
+
+          if (Math.abs(relativeY) > Math.abs(relativeZ)) {
+            axis = 'y';
+            layer = gridPos.y;
+            direction = relativeY > 0 ? (normal.x > 0 ? 1 : -1) : (normal.x > 0 ? -1 : 1);
+          } else {
+            axis = 'z';
+            layer = gridPos.z;
+            direction = relativeZ > 0 ? (normal.x > 0 ? -1 : 1) : (normal.x > 0 ? 1 : -1);
+          }
         } else if (absY > absX && absY > absZ) {
-          // Y axis (top/bottom face)
-          axis = 'y';
-          layer = gridPos.y;
-          direction = normal.y > 0 ? 1 : -1;
+          // Clicked top/bottom face - can rotate around X or Z
+          const cubeCenter = clickedCube.position;
+          const relativeX = point.x - cubeCenter.x;
+          const relativeZ = point.z - cubeCenter.z;
+
+          if (Math.abs(relativeX) > Math.abs(relativeZ)) {
+            axis = 'x';
+            layer = gridPos.x;
+            direction = relativeX > 0 ? (normal.y > 0 ? -1 : 1) : (normal.y > 0 ? 1 : -1);
+          } else {
+            axis = 'z';
+            layer = gridPos.z;
+            direction = relativeZ > 0 ? (normal.y > 0 ? 1 : -1) : (normal.y > 0 ? -1 : 1);
+          }
         } else {
-          // Z axis (front/back face)
-          axis = 'z';
-          layer = gridPos.z;
-          direction = normal.z > 0 ? 1 : -1;
+          // Clicked front/back face - can rotate around X or Y
+          const cubeCenter = clickedCube.position;
+          const relativeX = point.x - cubeCenter.x;
+          const relativeY = point.y - cubeCenter.y;
+
+          if (Math.abs(relativeX) > Math.abs(relativeY)) {
+            axis = 'x';
+            layer = gridPos.x;
+            direction = relativeX > 0 ? (normal.z > 0 ? 1 : -1) : (normal.z > 0 ? -1 : 1);
+          } else {
+            axis = 'y';
+            layer = gridPos.y;
+            direction = relativeY > 0 ? (normal.z > 0 ? -1 : 1) : (normal.z > 0 ? 1 : -1);
+          }
         }
 
         animateRotation(axis, layer, (Math.PI / 2) * direction);
@@ -1927,7 +1964,8 @@ function getCubeHTML(size) {
 
     function scrambleCube() {
       if (isAnimating) return;
-      const moves = 20;
+      // Random number of moves between 20 and 50
+      const moves = 20 + Math.floor(Math.random() * 31);
       let count = 0;
 
       function doMove() {
