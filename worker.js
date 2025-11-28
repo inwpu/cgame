@@ -1860,13 +1860,16 @@ function getCubeHTML(size) {
         interactionState.rotationLayer = layer;
 
         // Determine rotation direction
+        // The cross vector tells us the positive rotation direction
         const axisVec = new THREE.Vector3();
         axisVec[axis] = axis3D[axis];
 
         const cross = new THREE.Vector3();
-        cross.crossVectors(axisVec, interactionState.startPlane.normal);
+        cross.crossVectors(interactionState.startPlane.normal, axisVec);
 
-        const direction = cross.dot(dragVec) > 0 ? 1 : -1;
+        // The sign of the dot product determines rotation direction
+        const dotProduct = cross.dot(dragVec);
+        const direction = dotProduct > 0 ? 1 : -1;
 
         animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
