@@ -22,6 +22,10 @@ export default {
       const stats = await getStats(env);
       return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
     }
+    if (path === '/api/current') {
+      return new Response(JSON.stringify({ ip: clientIP, fingerprint }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path === '/stats') return new Response(getStatsPageHTML(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 
     return new Response('Not Found', { status: 404 });
   }
@@ -46,15 +50,18 @@ async function trackVisitor(env, ip, fingerprint, ua) {
     await env.VISITORS.put(key, JSON.stringify({ ip, ua, first: Date.now(), count: 1 }));
     const totalVisitors = parseInt((await env.VISITORS.get('total_visitors')) || '0');
     await env.VISITORS.put('total_visitors', String(totalVisitors + 1));
+
+    const totalVisits = parseInt((await env.VISITORS.get('total_visits')) || '0');
+    await env.VISITORS.put('total_visits', String(totalVisits + 1));
   } else {
     const data = JSON.parse(existing);
     data.count++;
     data.last = Date.now();
     await env.VISITORS.put(key, JSON.stringify(data));
-  }
 
-  const totalVisits = parseInt((await env.VISITORS.get('total_visits')) || '0');
-  await env.VISITORS.put('total_visits', String(totalVisits + 1));
+    const totalVisits = parseInt((await env.VISITORS.get('total_visits')) || '0');
+    await env.VISITORS.put('total_visits', String(totalVisits + 1));
+  }
 }
 
 async function getStats(env) {
@@ -78,6 +85,25 @@ async function getStats(env) {
   }
 
   return { visitors, visits, ips: ips.slice(0, 10) };
+}
+
+function getStatsFloatScript() {
+  return `
+    fetch('/api/current').then(r => r.json()).then(data => {
+      const statsEl = document.getElementById('stats');
+      if (statsEl) {
+        statsEl.innerHTML = \\\`
+          <div><strong>YOUR INFO</strong></div>
+          <div>IP: \\\${data.ip}</div>
+          <div>Fingerprint: \\\${data.fingerprint}</div>
+          <a href="/stats" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid #ddd;text-align:center;color:#0066cc;text-decoration:none;font-size:10px;">查看完整统计 →</a>
+        \\\`;
+        setTimeout(() => {
+          statsEl.classList.add('hidden');
+        }, 10000);
+      }
+    });
+  `;
 }
 
 function getParticleBackgroundScript() {
@@ -290,9 +316,23 @@ function getIndexHTML() {
       max-width: 250px;
       z-index: 100;
       font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
     }
+    .stats.hidden { opacity: 0; pointer-events: none; }
     .stats div { margin: 4px 0; color: #333; }
     .stats strong { font-weight: 600; }
+    .stats-link {
+      display: block;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+      text-align: center;
+      color: #0066cc;
+      text-decoration: none;
+      font-size: 10px;
+    }
+    .stats-link:hover { text-decoration: underline; }
     footer {
       margin-top: 60px;
       padding-top: 20px;
@@ -306,48 +346,48 @@ function getIndexHTML() {
 <body>
   <div class="container">
     <header>
-      <h1>Interactive Stress Relief Games: A Minimalist Approach</h1>
+      <h1>交互式解压游戏：极简主义方法</h1>
       <div class="meta">
-        hxorz Lab · 2025 · Interactive Systems Research
+        hxorz Lab · 2025 · 交互系统研究
       </div>
     </header>
 
     <div class="abstract">
-      <strong>Abstract</strong><br>
-      This work presents a collection of six interactive applications designed for stress relief through minimal user interaction. Each application employs distinct visual and interaction paradigms, ranging from physics-based simulations to generative visual patterns. The implementations prioritize simplicity, responsiveness, and therapeutic value.
+      <strong>摘要</strong><br>
+      本项目展示了六款通过极简交互设计实现压力缓解的应用程序集合。每个应用采用不同的视觉和交互范式，涵盖物理模拟到生成式视觉图案。所有实现都优先考虑简洁性、响应性和治疗价值。
     </div>
 
-    <div class="section-title">1. Experimental Applications</div>
+    <div class="section-title">1. 实验性应用</div>
     <div class="grid">
       <div class="card" onclick="location.href='/slime'">
         <div class="card-number">1.1</div>
-        <h3>Viscous Deformation Simulation</h3>
-        <p>Real-time soft-body physics with elastic recovery and breathable morphology.</p>
+        <h3>粘性形变模拟</h3>
+        <p>实时软体物理引擎，具备弹性恢复和呼吸形态特性。</p>
       </div>
       <div class="card" onclick="location.href='/bounce'">
         <div class="card-number">1.2</div>
-        <h3>Collision Dynamics System</h3>
-        <p>Multi-particle collision detection with gravity simulation and acoustic feedback.</p>
+        <h3>碰撞动力学系统</h3>
+        <p>多粒子碰撞检测，集成重力模拟和声学反馈机制。</p>
       </div>
       <div class="card" onclick="location.href='/fountain'">
         <div class="card-number">1.3</div>
-        <h3>Particle Emission Engine</h3>
-        <p>Configurable particle systems with multiple emission patterns and physics models.</p>
+        <h3>粒子发射引擎</h3>
+        <p>可配置粒子系统，支持多种发射模式和物理模型。</p>
       </div>
       <div class="card" onclick="location.href='/kaleidoscope'">
         <div class="card-number">1.4</div>
-        <h3>Symmetrical Pattern Generator</h3>
-        <p>Dynamic kaleidoscope with adjustable mirror segments and color schemes.</p>
+        <h3>对称图案生成器</h3>
+        <p>动态万花筒效果，可调节镜像分段和色彩方案。</p>
       </div>
       <div class="card" onclick="location.href='/breathing'">
         <div class="card-number">1.5</div>
-        <h3>Chromatic Oscillation Grid</h3>
-        <p>Asynchronous color transitions with parametric wave functions.</p>
+        <h3>色度振荡网格</h3>
+        <p>异步色彩转换，基于参数化波函数驱动。</p>
       </div>
       <div class="card" onclick="location.href='/cube3'">
         <div class="card-number">1.6</div>
-        <h3>3D Combinatorial Puzzle</h3>
-        <p>Interactive Rubik's cube with configurable dimensions (3×3, 4×4, 5×5).</p>
+        <h3>三维组合谜题</h3>
+        <p>交互式魔方模拟，支持可配置维度（3×3、4×4、5×5）。</p>
       </div>
     </div>
 
@@ -358,14 +398,18 @@ function getIndexHTML() {
   <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
-    fetch('/api/stats').then(r => r.json()).then(data => {
+    fetch('/api/current').then(r => r.json()).then(data => {
       document.getElementById('stats').innerHTML = \`
-        <div><strong>VISITOR STATS</strong></div>
-        <div>Total Visitors: \${data.visitors}</div>
-        <div>Total Views: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>Recent IPs:</strong></div>
-        \${data.ips.map(v => \`<div>\${v.ip} (\${v.count}x)</div>\`).join('')}
+        <div><strong>YOUR INFO</strong></div>
+        <div>IP: \${data.ip}</div>
+        <div>Fingerprint: \${data.fingerprint}</div>
+        <a href="/stats" class="stats-link">查看完整统计 →</a>
       \`;
+
+      // Hide after 10 seconds
+      setTimeout(() => {
+        document.getElementById('stats').classList.add('hidden');
+      }, 10000);
     });
   </script>
 </body>
@@ -388,16 +432,27 @@ function getSlimeHTML() {
             font-size: 24px; z-index: 100; padding: 10px 20px; background: rgba(255,255,255,0.1);
             border-radius: 10px; backdrop-filter: blur(10px); }
     .back:hover { background: rgba(255,255,255,0.2); }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .stats div { margin: 5px 0; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
   <a href="/" class="back">← 返回</a>
   <canvas id="slimeCanvas"></canvas>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     const canvas = document.getElementById('slimeCanvas');
@@ -520,16 +575,8 @@ function getSlimeHTML() {
       canvas.height = window.innerHeight;
     });
 
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
@@ -549,16 +596,27 @@ function getBounceHTML() {
             font-size: 24px; z-index: 100; padding: 10px 20px; background: rgba(255,255,255,0.1);
             border-radius: 10px; backdrop-filter: blur(10px); }
     .back:hover { background: rgba(255,255,255,0.2); }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .stats div { margin: 5px 0; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
   <a href="/" class="back">← 返回</a>
   <canvas id="canvas"></canvas>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     const canvas = document.getElementById('canvas');
@@ -704,17 +762,8 @@ function getBounceHTML() {
       requestAnimationFrame(animate);
     }
     animate();
-
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
@@ -739,10 +788,21 @@ function getFountainHTML() {
                        background: rgba(255,255,255,0.15); color: white; cursor: pointer;
                        font-size: 14px; backdrop-filter: blur(10px); transition: all 0.3s; }
     .controls button:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .stats div { margin: 5px 0; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -755,7 +815,7 @@ function getFountainHTML() {
     <button onclick="mode='explosion'">爆炸</button>
   </div>
   <canvas id="canvas"></canvas>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     const canvas = document.getElementById('canvas');
@@ -887,17 +947,8 @@ function getFountainHTML() {
       requestAnimationFrame(animate);
     }
     animate();
-
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
@@ -922,10 +973,21 @@ function getKaleidoscopeHTML() {
                        background: rgba(255,255,255,0.15); color: white; cursor: pointer;
                        backdrop-filter: blur(10px); transition: all 0.3s; }
     .controls button:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .stats div { margin: 5px 0; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -939,7 +1001,7 @@ function getKaleidoscopeHTML() {
     <button onclick="changeTheme('ocean')">海洋</button>
   </div>
   <canvas id="canvas"></canvas>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     const canvas = document.getElementById('canvas');
@@ -1005,17 +1067,8 @@ function getKaleidoscopeHTML() {
       requestAnimationFrame(animate);
     }
     animate();
-
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
@@ -1040,11 +1093,22 @@ function getBreathingHTML() {
                        backdrop-filter: blur(10px); transition: all 0.3s; }
     .controls button:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
     .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; width: 100vw; height: 100vh; }
-    .cell { transition: background-color 0.5s ease; }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .stats div { margin: 5px 0; }
+    .cell { transition: background-color 0.5s ease, transform 0.3s ease, filter 0.3s ease; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -1055,7 +1119,7 @@ function getBreathingHTML() {
     <button onclick="changeTheme('rainbow')">无限彩虹</button>
   </div>
   <div class="grid" id="grid"></div>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script>
     const grid = document.getElementById('grid');
@@ -1068,6 +1132,8 @@ function getBreathingHTML() {
       rainbow: { base: 0, range: 360 }
     };
 
+    let mouseX = -1, mouseY = -1;
+
     for (let i = 0; i < 30; i++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
@@ -1075,7 +1141,23 @@ function getBreathingHTML() {
       cell.dataset.offset = Math.random() * Math.PI * 2;
       grid.appendChild(cell);
       cells.push(cell);
+
+      // Add mouse interaction
+      cell.addEventListener('mouseenter', function() {
+        this.style.transform = 'scale(1.1)';
+        this.style.filter = 'brightness(1.5)';
+      });
+      cell.addEventListener('mouseleave', function() {
+        this.style.transform = 'scale(1)';
+        this.style.filter = 'brightness(1)';
+      });
     }
+
+    // Track mouse position for proximity effects
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
 
     function changeTheme(theme) {
       currentTheme = theme;
@@ -1088,32 +1170,38 @@ function getBreathingHTML() {
       cells.forEach((cell, i) => {
         const speed = parseFloat(cell.dataset.speed);
         const offset = parseFloat(cell.dataset.offset);
-        const brightness = 30 + Math.sin(time * speed + offset) * 20 + 30;
+
+        // Get cell position
+        const rect = cell.getBoundingClientRect();
+        const cellX = rect.left + rect.width / 2;
+        const cellY = rect.top + rect.height / 2;
+
+        // Calculate distance to mouse
+        const dx = mouseX - cellX;
+        const dy = mouseY - cellY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const maxDist = 300;
+        const proximity = Math.max(0, 1 - dist / maxDist);
+
+        // Brightness affected by time and mouse proximity
+        const baseBrightness = 30 + Math.sin(time * speed + offset) * 20 + 30;
+        const brightness = baseBrightness + proximity * 30;
 
         let hue;
         if (currentTheme === 'rainbow') {
-          hue = (time * 30 + i * 12) % 360;
+          hue = (time * 30 + i * 12 + proximity * 60) % 360;
         } else {
-          hue = theme.base + Math.sin(time * speed + offset) * theme.range / 2;
+          hue = theme.base + Math.sin(time * speed + offset) * theme.range / 2 + proximity * 30;
         }
 
-        cell.style.backgroundColor = \`hsl(\${hue}, 70%, \${brightness}%)\`;
+        cell.style.backgroundColor = \`hsl(\${hue}, \${70 + proximity * 30}%, \${brightness}%)\`;
       });
 
       requestAnimationFrame(animate);
     }
     animate();
-
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
@@ -1128,6 +1216,186 @@ function getCube4HTML() {
 
 function getCube5HTML() {
   return getCubeHTML(5);
+}
+
+function getStatsPageHTML() {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>访客统计排名</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', 'SimSun', serif;
+      background: #ffffff;
+      min-height: 100vh;
+      padding: 60px 40px 40px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      border-bottom: 2px solid #000;
+      padding-bottom: 30px;
+      margin-bottom: 40px;
+    }
+    h1 {
+      font-size: 2.2em;
+      font-weight: 400;
+      color: #000;
+      margin-bottom: 10px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #0066cc;
+      text-decoration: none;
+      font-size: 0.95em;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
+    }
+    .summary-box {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 20px;
+      text-align: center;
+    }
+    .summary-box .label {
+      font-size: 0.85em;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .summary-box .value {
+      font-size: 2em;
+      font-weight: 600;
+      color: #000;
+    }
+    .section-title {
+      font-size: 1.3em;
+      font-weight: 600;
+      color: #000;
+      margin: 40px 0 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background: #f9f9f9;
+      font-weight: 600;
+      font-size: 0.9em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #333;
+    }
+    tr:hover {
+      background: #fafafa;
+    }
+    .rank {
+      font-weight: 600;
+      color: #666;
+    }
+    .rank-1 { color: #FFD700; }
+    .rank-2 { color: #C0C0C0; }
+    .rank-3 { color: #CD7F32; }
+    .ip-cell {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← 返回首页</a>
+    <header>
+      <h1>访客统计排名</h1>
+      <div style="color: #666; font-size: 0.95em; margin-top: 10px;">Visitor Analytics & Rankings</div>
+    </header>
+
+    <div class="summary">
+      <div class="summary-box">
+        <div class="label">Total Visitors</div>
+        <div class="value" id="totalVisitors">-</div>
+      </div>
+      <div class="summary-box">
+        <div class="label">Total Views</div>
+        <div class="value" id="totalViews">-</div>
+      </div>
+    </div>
+
+    <div class="section-title">IP访问排名</div>
+    <table id="statsTable">
+      <thead>
+        <tr>
+          <th style="width: 80px;">排名</th>
+          <th>IP地址</th>
+          <th style="width: 120px;">访问次数</th>
+        </tr>
+      </thead>
+      <tbody id="statsBody">
+        <tr><td colspan="3" class="loading">加载中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <script>${getParticleBackgroundScript()}</script>
+  <script>
+    fetch('/api/stats').then(r => r.json()).then(data => {
+      document.getElementById('totalVisitors').textContent = data.visitors;
+      document.getElementById('totalViews').textContent = data.visits;
+
+      const tbody = document.getElementById('statsBody');
+      if (data.ips.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="loading">暂无数据</td></tr>';
+        return;
+      }
+
+      // Sort by count descending
+      const sorted = data.ips.sort((a, b) => b.count - a.count);
+
+      tbody.innerHTML = sorted.map((item, index) => {
+        const rank = index + 1;
+        const rankClass = rank <= 3 ? \`rank-\${rank}\` : 'rank';
+        return \`
+          <tr>
+            <td class="\${rankClass}">#\${rank}</td>
+            <td class="ip-cell">\${item.ip}</td>
+            <td>\${item.count}</td>
+          </tr>
+        \`;
+      }).join('');
+    }).catch(err => {
+      document.getElementById('statsBody').innerHTML = '<tr><td colspan="3" class="loading">加载失败</td></tr>';
+    });
+  </script>
+</body>
+</html>`;
 }
 
 function getCubeHTML(size) {
@@ -1173,11 +1441,21 @@ function getCubeHTML(size) {
     }
     .info-panel h3 { margin-bottom: 15px; color: #00aaff; }
     .info-panel p { margin: 8px 0; font-size: 14px; line-height: 1.6; }
-    .stats { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
-             color: white; padding: 15px; border-radius: 10px; font-size: 12px; max-width: 300px; z-index: 100;
-             box-shadow: 0 0 20px rgba(0,150,255,0.3); backdrop-filter: blur(10px);
-             border: 1px solid rgba(0,150,255,0.3); }
-    .stats div { margin: 5px 0; }
+    .stats {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      font-size: 11px;
+      max-width: 250px;
+      z-index: 100;
+      font-family: 'Courier New', monospace;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+    .stats.hidden { opacity: 0; pointer-events: none; }
     .floating-cubes {
       position: absolute;
       width: 100%;
@@ -1229,7 +1507,7 @@ function getCubeHTML(size) {
     <button onclick="solveCube()">复原</button>
   </div>
   <div id="container"></div>
-  <div class="stats" id="stats">加载中...</div>
+  <div class="stats" id="stats">Loading...</div>
   <script>${getParticleBackgroundScript()}</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
@@ -1378,17 +1656,29 @@ function getCubeHTML(size) {
       }
     }
 
+    let dragStartPos = { x: 0, y: 0 };
+    const DRAG_THRESHOLD = 5; // pixels
+
     function onMouseDown(e) {
-      isDragging = true;
+      isDragging = false;
+      dragStartPos = { x: e.clientX, y: e.clientY };
       previousMouse = { x: e.clientX, y: e.clientY };
     }
 
     function onMouseMove(e) {
-      if (!isDragging) return;
       const deltaX = e.clientX - previousMouse.x;
       const deltaY = e.clientY - previousMouse.y;
-      rubikGroup.rotation.y += deltaX * 0.01;
-      rubikGroup.rotation.x += deltaY * 0.01;
+
+      // Check if moved enough to be considered dragging
+      const totalDelta = Math.abs(e.clientX - dragStartPos.x) + Math.abs(e.clientY - dragStartPos.y);
+      if (totalDelta > DRAG_THRESHOLD) {
+        isDragging = true;
+      }
+
+      if (isDragging) {
+        rubikGroup.rotation.y += deltaX * 0.01;
+        rubikGroup.rotation.x += deltaY * 0.01;
+      }
       previousMouse = { x: e.clientX, y: e.clientY };
     }
 
@@ -1424,25 +1714,39 @@ function getCubeHTML(size) {
 
       if (intersects.length > 0) {
         const clickedCube = intersects[0].object;
-        const faceIndex = Math.floor(intersects[0].faceIndex / 2);
-        rotateFace(clickedCube, faceIndex);
+        const intersect = intersects[0];
+        const normal = intersect.face.normal.clone();
+
+        // Transform normal to world space
+        normal.transformDirection(clickedCube.matrixWorld);
+
+        // Determine which axis was clicked based on normal
+        const absX = Math.abs(normal.x);
+        const absY = Math.abs(normal.y);
+        const absZ = Math.abs(normal.z);
+
+        const gridPos = clickedCube.userData.gridPos;
+        let axis, layer, direction;
+
+        if (absX > absY && absX > absZ) {
+          // X axis (left/right face)
+          axis = 'x';
+          layer = gridPos.x;
+          direction = normal.x > 0 ? 1 : -1;
+        } else if (absY > absX && absY > absZ) {
+          // Y axis (top/bottom face)
+          axis = 'y';
+          layer = gridPos.y;
+          direction = normal.y > 0 ? 1 : -1;
+        } else {
+          // Z axis (front/back face)
+          axis = 'z';
+          layer = gridPos.z;
+          direction = normal.z > 0 ? 1 : -1;
+        }
+
+        animateRotation(axis, layer, (Math.PI / 2) * direction);
       }
-    }
-
-    function rotateFace(clickedCube, faceIndex) {
-      const gridPos = clickedCube.userData.gridPos;
-      let axis, layer;
-
-      // Map face to axis and layer based on clicked cubelet position
-      if (faceIndex === 0) { axis = 'x'; layer = gridPos.x; } // Right face
-      else if (faceIndex === 1) { axis = 'x'; layer = gridPos.x; } // Left face
-      else if (faceIndex === 2) { axis = 'y'; layer = gridPos.y; } // Top face
-      else if (faceIndex === 3) { axis = 'y'; layer = gridPos.y; } // Bottom face
-      else if (faceIndex === 4) { axis = 'z'; layer = gridPos.z; } // Front face
-      else if (faceIndex === 5) { axis = 'z'; layer = gridPos.z; } // Back face
-
-      const direction = (faceIndex % 2 === 0) ? 1 : -1;
-      animateRotation(axis, layer, (Math.PI / 2) * direction);
     }
 
     function animateRotation(axis, layer, angle) {
@@ -1574,17 +1878,8 @@ function getCubeHTML(size) {
     });
 
     init();
-
-    fetch('/api/stats').then(r => r.json()).then(data => {
-      document.getElementById('stats').innerHTML = \`
-        <div><strong>访客统计</strong></div>
-        <div>总访客: \${data.visitors}</div>
-        <div>总访问: \${data.visits}</div>
-        <div style="margin-top:8px"><strong>最近访客IP:</strong></div>
-        \${data.ips.map(v => \`<div>• \${v.ip} (访问\${v.count}次)</div>\`).join('')}
-      \`;
-    });
   </script>
+  <script>${getStatsFloatScript()}</script>
 </body>
 </html>`;
 }
